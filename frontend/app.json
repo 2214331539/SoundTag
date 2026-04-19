@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "SoundTag",
+    "slug": "soundtag",
+    "scheme": "soundtag",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#08131d"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.soundtag.mobile",
+      "infoPlist": {
+        "NFCReaderUsageDescription": "SoundTag uses NFC to identify stickers and open the correct audio record.",
+        "NSMicrophoneUsageDescription": "SoundTag needs microphone access to record your voice tags."
+      },
+      "entitlements": {
+        "com.apple.developer.nfc.readersession.formats": [
+          "NDEF",
+          "TAG"
+        ]
+      }
+    },
+    "android": {
+      "package": "com.soundtag.mobile",
+      "permissions": [
+        "android.permission.NFC",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      "expo-dev-client"
+    ]
+  }
+}
