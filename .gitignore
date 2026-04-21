@@ -1,20 +1,86 @@
-# Frontend
-frontend/node_modules/
-frontend/.expo/
-frontend/dist/
+# ==============================
+# Frontend (Expo / React Native)
+# ==============================
+# Expo & React Native 缓存/临时文件
+.expo/
+.expo-shared/
+node_modules/
+dist/
+build/
+web-build/
+.expo-*/
+metro.config.js.*
+babel.config.js.*
+.temp/
 
-# Backend
-backend/.venv/
-backend/__pycache__/
-backend/app/__pycache__/
-backend/*.db
-backend/.env
+# Android 原生构建文件（关键！就是你图里的这些）
+android/
+# 为什么要忽略？
+# - 这些是 Expo prebuild 自动生成的原生代码，每次运行 npx expo run:android 都会重新生成
+# - 提交到 Git 会和团队成员的本地构建环境冲突，导致构建失败
+# - 包含本地路径、签名信息等敏感内容，不适合共享
 
-# Python
-**/__pycache__/
-*.pyc
+# iOS 原生构建文件（如果后续用到）
+ios/
 
-# Logs and OS files
+# 其他前端临时文件
 *.log
 .DS_Store
 Thumbs.db
+.tmp/
+.cache/
+
+# ==============================
+# Backend (Python)
+# ==============================
+# 虚拟环境
+backend/.venv/
+venv/
+.env/
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+dist/
+build/
+eggs/
+.pytest_cache/
+.tox/
+.coverage
+*.coverage
+htmlcov/
+
+# 数据库 & 敏感配置
+backend/*.db
+*.sqlite3
+.env
+.env.local
+.env.*.local
+
+# ==============================
+# 全局通用忽略项
+# ==============================
+# IDE/编辑器配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# 日志文件
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+ehthumbs.db
