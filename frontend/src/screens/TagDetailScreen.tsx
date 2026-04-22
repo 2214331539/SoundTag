@@ -47,22 +47,27 @@ export function TagDetailScreen({ navigation, route }: Props) {
   }
 
   async function playFromUrl(file_url: string) {
-    await unloadSound();
+    try {
+      await unloadSound();
 
-    const { sound } = await Audio.Sound.createAsync(
-      { uri: file_url },
-      { shouldPlay: true },
-    );
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: file_url },
+        { shouldPlay: true },
+      );
 
-    sound.setOnPlaybackStatusUpdate((status) => {
-      if (!status.isLoaded) {
-        return;
-      }
-      setIsPlaying(status.isPlaying);
-    });
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isLoaded) {
+          return;
+        }
+        setIsPlaying(status.isPlaying);
+      });
 
-    soundRef.current = sound;
-    setIsPlaying(true);
+      soundRef.current = sound;
+      setIsPlaying(true);
+    } catch (error) {
+      setIsPlaying(false);
+      throw error;
+    }
   }
 
   async function loadTag() {
@@ -84,28 +89,32 @@ export function TagDetailScreen({ navigation, route }: Props) {
   }
 
   async function togglePlayback() {
-    const fileUrl = tagState?.latest_record?.file_url;
-    if (!fileUrl) {
-      return;
-    }
+    try {
+      const fileUrl = tagState?.latest_record?.file_url;
+      if (!fileUrl) {
+        return;
+      }
 
-    if (!soundRef.current) {
-      await playFromUrl(fileUrl);
-      return;
-    }
+      if (!soundRef.current) {
+        await playFromUrl(fileUrl);
+        return;
+      }
 
-    const status = await soundRef.current.getStatusAsync();
-    if (!status.isLoaded) {
-      await playFromUrl(fileUrl);
-      return;
-    }
+      const status = await soundRef.current.getStatusAsync();
+      if (!status.isLoaded) {
+        await playFromUrl(fileUrl);
+        return;
+      }
 
-    if (status.isPlaying) {
-      await soundRef.current.pauseAsync();
-      setIsPlaying(false);
-    } else {
-      await soundRef.current.playAsync();
-      setIsPlaying(true);
+      if (status.isPlaying) {
+        await soundRef.current.pauseAsync();
+        setIsPlaying(false);
+      } else {
+        await soundRef.current.playAsync();
+        setIsPlaying(true);
+      }
+    } catch (error) {
+      Alert.alert("播放失败", extractMessage(error));
     }
   }
 

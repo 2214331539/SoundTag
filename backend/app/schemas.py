@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from typing_extensions import Annotated
@@ -12,7 +13,7 @@ TagStatus = Literal["new", "owned", "locked"]
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
+    id: UUID
     phone: str
     display_name: str | None = None
     created_at: datetime
@@ -43,9 +44,9 @@ class TokenResponse(BaseModel):
 class AudioRecordRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
-    tag_id: str
-    owner_id: str
+    id: UUID
+    tag_id: UUID
+    owner_id: UUID
     object_key: str
     file_url: str
     mime_type: str
@@ -89,7 +90,7 @@ class FinalizeUploadPayload(BaseModel):
 
 
 class TimelineRecord(BaseModel):
-    id: str
+    id: UUID
     uid: str
     object_key: str
     file_url: str

@@ -29,28 +29,24 @@ export async function uploadAudioToOss({ credential, file_uri }: UploadAudioArgs
     CryptoJS.HmacSHA1(policy, credential.access_key_secret),
   );
 
-  const formData = new FormData();
-  formData.append("key", credential.object_key);
-  formData.append("policy", policy);
-  formData.append("OSSAccessKeyId", credential.access_key_id);
-  formData.append("x-oss-security-token", credential.security_token);
-  formData.append("success_action_status", "200");
-  formData.append("Signature", signature);
-  formData.append("Content-Type", credential.mime_type);
-  formData.append("file", {
-    uri: file_uri,
-    name: credential.object_key.split("/").pop() ?? "soundtag-audio.m4a",
-    type: credential.mime_type,
-  } as any);
-
-  const response = await fetch(credential.upload_url, {
-    method: "POST",
-    body: formData,
+  const response = await FileSystem.uploadAsync(credential.upload_url, file_uri, {
+    fieldName: "file",
+    httpMethod: "POST",
+    mimeType: credential.mime_type,
+    parameters: {
+      key: credential.object_key,
+      policy,
+      OSSAccessKeyId: credential.access_key_id,
+      "x-oss-security-token": credential.security_token,
+      success_action_status: "200",
+      Signature: signature,
+      "Content-Type": credential.mime_type,
+    },
+    uploadType: FileSystem.FileSystemUploadType.MULTIPART,
   });
 
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(`OSS 上传失败: ${response.status} ${message}`);
+  if (response.status !== 200) {
+    throw new Error(`OSS上传失败：${response.status}. ${response.body}`);
   }
 
   return {

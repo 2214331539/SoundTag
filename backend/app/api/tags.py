@@ -12,7 +12,7 @@ from app.schemas import (
     UploadCredentialRequest,
     UploadCredentialResponse,
 )
-from app.services.oss import build_object_key, delete_object, issue_upload_credential
+from app.services.oss import build_access_url, build_object_key, build_public_url, delete_object, issue_upload_credential
 
 
 router = APIRouter(prefix="/tags", tags=["tags"])
@@ -28,6 +28,11 @@ def _latest_record_for_tag(session: Session, tag_id: str) -> AudioRecord | None:
         .where(AudioRecord.tag_id == tag_id, AudioRecord.is_active.is_(True))
         .order_by(AudioRecord.created_at.desc())
     ).first()
+
+
+def _serialize_audio_record(record: AudioRecord) -> AudioRecordRead:
+    payload = AudioRecordRead.model_validate(record)
+    return payload.model_copy(update={"file_url": build_access_url(record.object_key)})
 
 
 @router.get("/{uid}", response_model=TagStateResponse)
@@ -47,7 +52,7 @@ def lookup_tag(
     return TagStateResponse(
         uid=uid,
         status="owned",
-        latest_record=AudioRecordRead.model_validate(latest_record) if latest_record else None,
+        latest_record=_serialize_audio_record(latest_record) if latest_record else None,
     )
 
 
@@ -97,7 +102,7 @@ def bind_uploaded_audio(
         tag_id=tag.id,
         owner_id=current_user.id,
         object_key=payload.object_key,
-        file_url=payload.file_url,
+        file_url=build_public_url(payload.object_key),
         mime_type=payload.mime_type,
         duration_seconds=payload.duration_seconds,
         file_size=payload.file_size,
@@ -116,4 +121,4 @@ def bind_uploaded_audio(
             # Old files should be deleted eventually, but binding must stay successful.
             continue
 
-    return AudioRecordRead.model_validate(new_record)
+    return _serialize_audio_record(new_record)

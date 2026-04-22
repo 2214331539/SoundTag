@@ -5,6 +5,7 @@ from app.api.deps import get_current_user
 from app.core.db import get_session
 from app.models import AudioRecord, Tag, User
 from app.schemas import TimelineRecord
+from app.services.oss import build_access_url
 
 
 router = APIRouter(prefix="/records", tags=["records"])
@@ -24,10 +25,10 @@ def list_records(
 
     return [
         TimelineRecord(
-            id=str(record.id),
+            id=record.id,
             uid=uid,
             object_key=record.object_key,
-            file_url=record.file_url,
+            file_url=build_access_url(record.object_key),
             mime_type=record.mime_type,
             duration_seconds=record.duration_seconds,
             file_size=record.file_size,

@@ -89,6 +89,8 @@ Copy-Item .env.example .env
 
 ```powershell
 npx expo run:android
+# 执行下面这个
+npx expo run:android
 npx expo start --dev-client
 ```
 

@@ -6,9 +6,10 @@ import { AuthUser, AudioRecord, RequestCodeResponse, TagState, TimelineRecord, T
 
 const SESSION_TOKEN_KEY = "soundtag/access-token";
 const SESSION_USER_KEY = "soundtag/current-user";
+const env = process.env as Record<string, string | undefined>;
 
 const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://10.0.2.2:8000/api/v1",
+  baseURL: env.EXPO_PUBLIC_API_BASE_URL ?? "http://10.0.2.2:8000/api/v1",
   timeout: 20000,
 });
 
