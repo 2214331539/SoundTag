@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 
-import { AuthUser, AudioRecord, RequestCodeResponse, TagState, TimelineRecord, TokenResponse, UploadCredential } from "../types";
+import { AuthPurpose, AuthUser, AudioRecord, RequestCodeResponse, TagState, TimelineRecord, TokenResponse, UploadCredential } from "../types";
 
 
 const SESSION_TOKEN_KEY = "soundtag/access-token";
@@ -65,8 +65,8 @@ export async function clearSession() {
 }
 
 
-export async function requestCode(phone: string): Promise<RequestCodeResponse> {
-  const response = await api.post<RequestCodeResponse>("/auth/request-code", { phone });
+export async function requestCode(phone: string, purpose: AuthPurpose): Promise<RequestCodeResponse> {
+  const response = await api.post<RequestCodeResponse>("/auth/request-code", { phone, purpose });
   return response.data;
 }
 
@@ -74,11 +74,13 @@ export async function requestCode(phone: string): Promise<RequestCodeResponse> {
 export async function verifyCode(
   phone: string,
   code: string,
+  purpose: AuthPurpose,
   display_name?: string,
 ): Promise<TokenResponse> {
   const response = await api.post<TokenResponse>("/auth/verify-code", {
     phone,
     code,
+    purpose,
     display_name,
   });
   return response.data;

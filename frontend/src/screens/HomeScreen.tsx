@@ -48,8 +48,8 @@ export function HomeScreen() {
         return;
       }
 
-      setLastAction("标签不可用");
-      Alert.alert("无法使用这张标签", "这张标签已绑定到其他账号，当前账号不能播放或覆盖。");
+      setLastAction("标签状态异常");
+      Alert.alert("暂时无法使用这张标签", "请重试扫描，或确认后端服务已更新为共享标签模式。");
     } catch (error) {
       setLastAction("识别失败");
       Alert.alert("识别失败", extractMessage(error));

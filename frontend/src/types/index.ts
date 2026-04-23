@@ -1,3 +1,5 @@
+export type AuthPurpose = "login" | "register";
+
 export type AuthUser = {
   id: string;
   phone: string;

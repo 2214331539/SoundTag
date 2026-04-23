@@ -1,5 +1,4 @@
 from functools import lru_cache
-
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -27,6 +26,22 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_hours: int = 24 * 7
     debug_expose_otp: bool = True
+    sms_provider: str = "log"
+    sms_code_expire_minutes: int = 5
+    sms_resend_cooldown_seconds: int = 60
+    sms_sign_name: str | None = None
+    sms_template_code: str | None = None
+    sms_template_code_key: str = "code"
+    aliyun_sms_endpoint: str = "dysmsapi.aliyuncs.com"
+    aliyun_pnvs_endpoint: str = "dypnsapi.aliyuncs.com"
+    aliyun_verify_scheme_name: str | None = None
+    aliyun_verify_code_length: int = 6
+    aliyun_verify_code_type: int = 1
+    aliyun_verify_valid_time_seconds: int = 300
+    aliyun_verify_duplicate_policy: int = 1
+    aliyun_verify_interval_seconds: int = 60
+    aliyun_verify_return_code: bool = False
+    aliyun_verify_auto_retry: int = 1
 
     database_url: str = "sqlite:///./soundtag.db"
 
@@ -49,6 +64,51 @@ class Settings(BaseSettings):
                 self.oss_bucket,
                 self.oss_role_arn,
                 self.oss_endpoint,
+            ]
+        )
+
+    @property
+    def aliyun_sms_enabled(self) -> bool:
+        return all(
+            [
+                self.aliyun_access_key_id,
+                self.aliyun_access_key_secret,
+                self.sms_sign_name,
+                self.sms_template_code,
+                self.aliyun_sms_endpoint,
+            ]
+        )
+
+    @property
+    def sms_provider_normalized(self) -> str:
+        provider = self.sms_provider.strip().lower().replace("-", "_")
+        aliases = {
+            "aliyuncloud": "aliyun_cloud",
+            "aliyun_cloud_verify": "aliyun_cloud",
+            "aliyun_verify": "aliyun_cloud",
+            "aliyun_pnvs": "aliyun_cloud",
+            "dypns": "aliyun_cloud",
+            "dypnsapi": "aliyun_cloud",
+            "pnvs": "aliyun_cloud",
+        }
+        return aliases.get(provider, provider)
+
+    @property
+    def effective_aliyun_pnvs_endpoint(self) -> str:
+        if self.aliyun_sms_endpoint and self.aliyun_sms_endpoint.startswith("dypns"):
+            return self.aliyun_sms_endpoint
+
+        return self.aliyun_pnvs_endpoint
+
+    @property
+    def aliyun_cloud_verify_enabled(self) -> bool:
+        return all(
+            [
+                self.aliyun_access_key_id,
+                self.aliyun_access_key_secret,
+                self.sms_sign_name,
+                self.sms_template_code,
+                self.aliyun_pnvs_endpoint,
             ]
         )
 

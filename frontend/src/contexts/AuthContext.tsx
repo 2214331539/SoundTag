@@ -8,14 +8,19 @@ import {
   requestCode as requestCodeApi,
   verifyCode as verifyCodeApi,
 } from "../services/api";
-import { AuthUser, RequestCodeResponse } from "../types";
+import { AuthPurpose, AuthUser, RequestCodeResponse } from "../types";
 
 
 type AuthContextValue = {
   user: AuthUser | null;
   is_loading: boolean;
-  requestCode: (phone: string) => Promise<RequestCodeResponse>;
-  verifyCode: (phone: string, code: string, display_name?: string) => Promise<void>;
+  requestCode: (phone: string, purpose: AuthPurpose) => Promise<RequestCodeResponse>;
+  verifyCode: (
+    phone: string,
+    code: string,
+    purpose: AuthPurpose,
+    display_name?: string,
+  ) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -63,12 +68,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
-  async function requestCode(phone: string) {
-    return requestCodeApi(phone);
+  async function requestCode(phone: string, purpose: AuthPurpose) {
+    return requestCodeApi(phone, purpose);
   }
 
-  async function verifyCode(phone: string, code: string, display_name?: string) {
-    const response = await verifyCodeApi(phone, code, display_name);
+  async function verifyCode(
+    phone: string,
+    code: string,
+    purpose: AuthPurpose,
+    display_name?: string,
+  ) {
+    const response = await verifyCodeApi(phone, code, purpose, display_name);
     await persistSession(response.access_token, response.user);
     setUser(response.user);
   }

@@ -8,6 +8,7 @@ from typing_extensions import Annotated
 
 PhoneNumber = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^\+?\d{7,15}$")]
 TagStatus = Literal["new", "owned", "locked"]
+AuthPurpose = Literal["login", "register"]
 
 
 class UserRead(BaseModel):
@@ -21,6 +22,7 @@ class UserRead(BaseModel):
 
 class RequestCodePayload(BaseModel):
     phone: PhoneNumber
+    purpose: AuthPurpose
 
 
 class RequestCodeResponse(BaseModel):
@@ -31,6 +33,7 @@ class RequestCodeResponse(BaseModel):
 
 class VerifyCodePayload(BaseModel):
     phone: PhoneNumber
+    purpose: AuthPurpose
     code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=4, max_length=6)]
     display_name: str | None = Field(default=None, max_length=64)
 

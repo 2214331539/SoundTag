@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
 
 from app.api.deps import get_current_user
@@ -39,14 +39,11 @@ def _serialize_audio_record(record: AudioRecord) -> AudioRecordRead:
 def lookup_tag(
     uid: str,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(get_current_user),
 ) -> TagStateResponse:
     tag = _fetch_tag_by_uid(session, uid)
     if tag is None:
         return TagStateResponse(uid=uid, status="new")
-
-    if tag.owner_id != current_user.id:
-        return TagStateResponse(uid=uid, status="locked")
 
     latest_record = _latest_record_for_tag(session, tag.id)
     if latest_record is None:
@@ -65,10 +62,6 @@ def create_upload_credential(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> UploadCredentialResponse:
-    tag = _fetch_tag_by_uid(session, payload.uid)
-    if tag is not None and tag.owner_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This tag belongs to another account.")
-
     object_key = build_object_key(str(current_user.id), payload.uid, payload.file_extension)
     return issue_upload_credential(object_key, payload.mime_type)
 
@@ -86,8 +79,6 @@ def bind_uploaded_audio(
         session.add(tag)
         session.commit()
         session.refresh(tag)
-    elif tag.owner_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This tag belongs to another account.")
 
     previous_records = session.exec(
         select(AudioRecord).where(AudioRecord.tag_id == tag.id, AudioRecord.is_active.is_(True))
@@ -113,6 +104,7 @@ def bind_uploaded_audio(
     )
 
     tag.updated_at = now
+    tag.owner_id = current_user.id
     session.add(tag)
     session.add(new_record)
     session.commit()
