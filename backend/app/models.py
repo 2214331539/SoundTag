@@ -10,6 +10,7 @@ class User(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     phone: str = Field(index=True, unique=True, nullable=False)
     display_name: str | None = Field(default=None, max_length=64)
+    password_hash: str | None = Field(default=None, max_length=255)
     created_at: datetime = Field(default_factory=utcnow, nullable=False)
 
 

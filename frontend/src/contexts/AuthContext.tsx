@@ -4,6 +4,7 @@ import {
   clearSession,
   getMe,
   hydrateSession,
+  passwordLogin as passwordLoginApi,
   persistSession,
   requestCode as requestCodeApi,
   verifyCode as verifyCodeApi,
@@ -20,7 +21,9 @@ type AuthContextValue = {
     code: string,
     purpose: AuthPurpose,
     display_name?: string,
+    password?: string,
   ) => Promise<void>;
+  passwordLogin: (phone: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -77,8 +80,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
     code: string,
     purpose: AuthPurpose,
     display_name?: string,
+    password?: string,
   ) {
-    const response = await verifyCodeApi(phone, code, purpose, display_name);
+    const response = await verifyCodeApi(phone, code, purpose, display_name, password);
+    await persistSession(response.access_token, response.user);
+    setUser(response.user);
+  }
+
+  async function passwordLogin(phone: string, password: string) {
+    const response = await passwordLoginApi(phone, password);
     await persistSession(response.access_token, response.user);
     setUser(response.user);
   }
@@ -95,6 +105,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         is_loading,
         requestCode,
         verifyCode,
+        passwordLogin,
         logout,
       }}
     >

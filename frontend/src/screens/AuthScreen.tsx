@@ -9,16 +9,21 @@ import { colors, radii, shadows } from "../theme";
 import { AuthPurpose } from "../types";
 
 
-export function AuthScreen() {
-  const { requestCode, verifyCode } = useAuth();
+type AuthMode = "password_login" | "sms_login" | "register" | "reset_password";
 
-  const [authMode, setAuthMode] = useState<AuthPurpose>("login");
+
+export function AuthScreen() {
+  const { passwordLogin, requestCode, verifyCode } = useAuth();
+
+  const [authMode, setAuthMode] = useState<AuthMode>("password_login");
   const [phone, setPhone] = useState("13800138000");
   const [displayName, setDisplayName] = useState("我的 SoundTag");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [code, setCode] = useState("");
   const [debugCode, setDebugCode] = useState<string | null>(null);
   const [requesting, setRequesting] = useState(false);
-  const [verifying, setVerifying] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [countdown, setCountdown] = useState(0);
 
   useEffect(() => {
@@ -30,10 +35,13 @@ export function AuthScreen() {
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  function handleModeChange(nextMode: AuthPurpose) {
+  function handleModeChange(nextMode: AuthMode) {
     setAuthMode(nextMode);
     setCode("");
     setDebugCode(null);
+    setPassword("");
+    setConfirmPassword("");
+    setCountdown(0);
   }
 
   function handlePhoneChange(value: string) {
@@ -51,6 +59,32 @@ export function AuthScreen() {
     return `+86${phone}`;
   }
 
+  function getCodePurpose(): AuthPurpose {
+    if (authMode === "register") {
+      return "register";
+    }
+
+    if (authMode === "reset_password") {
+      return "reset_password";
+    }
+
+    return "login";
+  }
+
+  function validatePasswordPair() {
+    if (password.length < 8) {
+      Alert.alert("密码太短", "请设置至少 8 位密码。");
+      return false;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert("两次密码不一致", "请确认两次输入的新密码相同。");
+      return false;
+    }
+
+    return true;
+  }
+
   async function handleRequestCode() {
     const normalizedPhone = getNormalizedPhone();
     if (!normalizedPhone) {
@@ -59,7 +93,7 @@ export function AuthScreen() {
 
     try {
       setRequesting(true);
-      const response = await requestCode(normalizedPhone, authMode);
+      const response = await requestCode(normalizedPhone, getCodePurpose());
       setDebugCode(response.debug_code ?? null);
       setCountdown(60);
       Alert.alert("验证码已发送", getRequestSuccessMessage(response.debug_code));
@@ -67,6 +101,27 @@ export function AuthScreen() {
       Alert.alert("发送失败", extractMessage(error));
     } finally {
       setRequesting(false);
+    }
+  }
+
+  async function handlePasswordLogin() {
+    const normalizedPhone = getNormalizedPhone();
+    if (!normalizedPhone) {
+      return;
+    }
+
+    if (!password) {
+      Alert.alert("请输入密码", "请填写你的账号密码。");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await passwordLogin(normalizedPhone, password);
+    } catch (error) {
+      Alert.alert("登录失败", extractMessage(error));
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -86,61 +141,52 @@ export function AuthScreen() {
       return;
     }
 
+    if ((authMode === "register" || authMode === "reset_password") && !validatePasswordPair()) {
+      return;
+    }
+
     try {
-      setVerifying(true);
+      setSubmitting(true);
       await verifyCode(
         normalizedPhone,
         code.trim(),
-        authMode,
+        getCodePurpose(),
         authMode === "register" ? displayName.trim() : undefined,
+        authMode === "register" || authMode === "reset_password" ? password : undefined,
       );
     } catch (error) {
-      Alert.alert(authMode === "register" ? "注册失败" : "登录失败", extractMessage(error));
+      Alert.alert(getSubmitErrorTitle(authMode), extractMessage(error));
     } finally {
-      setVerifying(false);
+      setSubmitting(false);
     }
   }
 
-  const isRegister = authMode === "register";
-  const title = isRegister ? "创建 SoundTag 账号" : "欢迎回来";
-  const subtitle = isRegister ? "用手机号注册后即可绑定你的 NFC 声音标签" : "输入手机号和验证码登录";
+  const modeCopy = getModeCopy(authMode);
+  const usesCode = authMode !== "password_login";
+  const needsPasswordSetup = authMode === "register" || authMode === "reset_password";
   const requestLabel = countdown > 0 ? `${countdown}s 后重发` : "获取验证码  ->";
 
   return (
-    <ScreenShell title={title} scroll showPageHeader={false}>
+    <ScreenShell title={modeCopy.title} scroll showPageHeader={false}>
       <View style={styles.hero}>
         <View style={styles.soundMark}>
           <WaveGlyph height={58} color={colors.primary} accentColor={colors.primary} />
         </View>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.subtitle}>{subtitle}</Text>
+        <Text style={styles.title}>{modeCopy.title}</Text>
+        <Text style={styles.subtitle}>{modeCopy.subtitle}</Text>
       </View>
 
       <View style={styles.segmented}>
-        <ModeButton active={authMode === "login"} label="登录" onPress={() => handleModeChange("login")} />
+        <ModeButton active={authMode === "password_login"} label="密码登录" onPress={() => handleModeChange("password_login")} />
+        <ModeButton active={authMode === "sms_login"} label="验证码登录" onPress={() => handleModeChange("sms_login")} />
         <ModeButton active={authMode === "register"} label="注册" onPress={() => handleModeChange("register")} />
+        <ModeButton active={authMode === "reset_password"} label="忘记密码" onPress={() => handleModeChange("reset_password")} />
       </View>
 
       <View style={styles.form}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>手机号</Text>
-          <View style={styles.phoneField}>
-            <Text style={styles.countryCode}>+86</Text>
-            <View style={styles.divider} />
-            <TextInput
-              autoCapitalize="none"
-              keyboardType="number-pad"
-              maxLength={11}
-              onChangeText={handlePhoneChange}
-              placeholder="请输入手机号"
-              placeholderTextColor={colors.textSoft}
-              style={styles.phoneInput}
-              value={phone}
-            />
-          </View>
-        </View>
+        <PhoneField phone={phone} onChange={handlePhoneChange} />
 
-        {isRegister ? (
+        {authMode === "register" ? (
           <View style={styles.inputGroup}>
             <Text style={styles.label}>昵称</Text>
             <TextInput
@@ -154,44 +200,120 @@ export function AuthScreen() {
           </View>
         ) : null}
 
-        <PrimaryButton
-          label={requestLabel}
-          loading={requesting}
-          disabled={countdown > 0}
-          onPress={handleRequestCode}
-          size="lg"
-        />
+        {authMode === "password_login" ? (
+          <PasswordField label="密码" value={password} onChange={setPassword} placeholder="请输入账号密码" />
+        ) : null}
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>验证码</Text>
-          <TextInput
-            keyboardType="number-pad"
-            maxLength={6}
-            onChangeText={(value) => setCode(value.replace(/\D/g, "").slice(0, 6))}
-            placeholder="输入短信验证码"
-            placeholderTextColor={colors.textSoft}
-            style={styles.input}
-            value={code}
-          />
-        </View>
+        {usesCode ? (
+          <>
+            <PrimaryButton
+              label={requestLabel}
+              loading={requesting}
+              disabled={countdown > 0}
+              onPress={handleRequestCode}
+              size="lg"
+            />
 
-        {debugCode ? (
-          <View style={styles.debugCard}>
-            <Text style={styles.debugLabel}>调试验证码</Text>
-            <Text style={styles.debugValue}>{debugCode}</Text>
-          </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>验证码</Text>
+              <TextInput
+                keyboardType="number-pad"
+                maxLength={6}
+                onChangeText={(value) => setCode(value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="输入短信验证码"
+                placeholderTextColor={colors.textSoft}
+                style={styles.input}
+                value={code}
+              />
+            </View>
+
+            {debugCode ? (
+              <View style={styles.debugCard}>
+                <Text style={styles.debugLabel}>调试验证码</Text>
+                <Text style={styles.debugValue}>{debugCode}</Text>
+              </View>
+            ) : null}
+          </>
+        ) : null}
+
+        {needsPasswordSetup ? (
+          <>
+            <PasswordField
+              label={authMode === "register" ? "设置密码" : "新密码"}
+              value={password}
+              onChange={setPassword}
+              placeholder="至少 8 位"
+            />
+            <PasswordField
+              label="确认密码"
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+              placeholder="再次输入密码"
+            />
+          </>
         ) : null}
 
         <PrimaryButton
-          label={isRegister ? "注册并进入" : "登录"}
-          loading={verifying}
-          onPress={handleVerifyCode}
+          label={modeCopy.submitLabel}
+          loading={submitting}
+          onPress={authMode === "password_login" ? handlePasswordLogin : handleVerifyCode}
           variant="secondary"
         />
       </View>
 
       <Text style={styles.agreement}>登录或注册即代表同意 用户协议 和 隐私政策</Text>
     </ScreenShell>
+  );
+}
+
+
+function PhoneField({ phone, onChange }: { phone: string; onChange: (value: string) => void }) {
+  return (
+    <View style={styles.inputGroup}>
+      <Text style={styles.label}>手机号</Text>
+      <View style={styles.phoneField}>
+        <Text style={styles.countryCode}>+86</Text>
+        <View style={styles.divider} />
+        <TextInput
+          autoCapitalize="none"
+          keyboardType="number-pad"
+          maxLength={11}
+          onChangeText={onChange}
+          placeholder="请输入手机号"
+          placeholderTextColor={colors.textSoft}
+          style={styles.phoneInput}
+          value={phone}
+        />
+      </View>
+    </View>
+  );
+}
+
+
+function PasswordField({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <View style={styles.inputGroup}>
+      <Text style={styles.label}>{label}</Text>
+      <TextInput
+        maxLength={128}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textSoft}
+        secureTextEntry
+        style={styles.input}
+        value={value}
+      />
+    </View>
   );
 }
 
@@ -217,6 +339,49 @@ function ModeButton({
       <Text style={[styles.modeButtonText, active ? styles.modeButtonTextActive : null]}>{label}</Text>
     </Pressable>
   );
+}
+
+
+function getModeCopy(mode: AuthMode) {
+  switch (mode) {
+    case "sms_login":
+      return {
+        title: "验证码登录",
+        subtitle: "通过短信验证码快速进入 SoundTag",
+        submitLabel: "验证并登录",
+      };
+    case "register":
+      return {
+        title: "创建 SoundTag 账号",
+        subtitle: "验证手机号后设置密码，后续可用密码登录",
+        submitLabel: "注册并进入",
+      };
+    case "reset_password":
+      return {
+        title: "找回密码",
+        subtitle: "验证手机号后设置一个新的账号密码",
+        submitLabel: "重置密码并登录",
+      };
+    default:
+      return {
+        title: "欢迎回来",
+        subtitle: "使用手机号和密码登录",
+        submitLabel: "登录",
+      };
+  }
+}
+
+
+function getSubmitErrorTitle(mode: AuthMode) {
+  if (mode === "register") {
+    return "注册失败";
+  }
+
+  if (mode === "reset_password") {
+    return "重置失败";
+  }
+
+  return "登录失败";
 }
 
 
@@ -260,47 +425,51 @@ function extractMessage(error: unknown) {
 const styles = StyleSheet.create({
   hero: {
     alignItems: "center",
-    paddingTop: 70,
-    paddingBottom: 28,
+    paddingTop: 48,
+    paddingBottom: 24,
   },
   soundMark: {
     alignItems: "center",
     justifyContent: "center",
-    width: 108,
-    height: 108,
+    width: 104,
+    height: 104,
     borderRadius: radii.full,
     backgroundColor: colors.surfaceMid,
-    marginBottom: 34,
+    marginBottom: 28,
     ...shadows.soft,
   },
   title: {
     color: colors.text,
-    fontSize: 32,
+    fontSize: 31,
     fontWeight: "800",
     letterSpacing: -1,
     textAlign: "center",
   },
   subtitle: {
     color: colors.textMuted,
-    fontSize: 18,
-    lineHeight: 28,
-    marginTop: 12,
+    fontSize: 17,
+    lineHeight: 27,
+    marginTop: 10,
     textAlign: "center",
   },
   segmented: {
     flexDirection: "row",
+    flexWrap: "wrap",
     backgroundColor: "rgba(240,237,240,0.88)",
-    borderRadius: radii.full,
+    borderRadius: radii.lg,
     padding: 6,
     marginBottom: 22,
+    gap: 6,
     ...shadows.soft,
   },
   modeButton: {
     alignItems: "center",
     justifyContent: "center",
-    flex: 1,
-    minHeight: 46,
+    flexBasis: "48%",
+    flexGrow: 1,
+    minHeight: 44,
     borderRadius: radii.full,
+    paddingHorizontal: 8,
   },
   modeButtonActive: {
     backgroundColor: colors.white,
@@ -311,14 +480,14 @@ const styles = StyleSheet.create({
   },
   modeButtonText: {
     color: colors.textMuted,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "800",
   },
   modeButtonTextActive: {
     color: colors.primary,
   },
   form: {
-    gap: 18,
+    gap: 16,
   },
   inputGroup: {
     gap: 8,
@@ -332,7 +501,7 @@ const styles = StyleSheet.create({
   phoneField: {
     alignItems: "center",
     flexDirection: "row",
-    minHeight: 64,
+    minHeight: 62,
     borderRadius: radii.full,
     backgroundColor: "rgba(240,237,240,0.88)",
     borderWidth: 1,
@@ -359,7 +528,7 @@ const styles = StyleSheet.create({
     minHeight: 54,
   },
   input: {
-    minHeight: 60,
+    minHeight: 58,
     borderRadius: radii.full,
     backgroundColor: "rgba(240,237,240,0.88)",
     borderWidth: 1,

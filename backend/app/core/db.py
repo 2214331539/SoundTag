@@ -16,6 +16,7 @@ engine = create_engine(settings.database_url, echo=settings.debug, connect_args=
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)
     _ensure_audio_record_title_column()
+    _ensure_user_password_hash_column()
 
 
 def _ensure_audio_record_title_column() -> None:
@@ -29,6 +30,19 @@ def _ensure_audio_record_title_column() -> None:
 
     with engine.begin() as connection:
         connection.execute(text("ALTER TABLE audiorecord ADD COLUMN title VARCHAR(100)"))
+
+
+def _ensure_user_password_hash_column() -> None:
+    inspector = inspect(engine)
+    if not inspector.has_table("user"):
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("user")}
+    if "password_hash" in columns:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(text('ALTER TABLE "user" ADD COLUMN password_hash VARCHAR(255)'))
 
 
 def get_session() -> Session:

@@ -76,12 +76,23 @@ export async function verifyCode(
   code: string,
   purpose: AuthPurpose,
   display_name?: string,
+  password?: string,
 ): Promise<TokenResponse> {
   const response = await api.post<TokenResponse>("/auth/verify-code", {
     phone,
     code,
     purpose,
     display_name,
+    password,
+  });
+  return response.data;
+}
+
+
+export async function passwordLogin(phone: string, password: string): Promise<TokenResponse> {
+  const response = await api.post<TokenResponse>("/auth/password-login", {
+    phone,
+    password,
   });
   return response.data;
 }

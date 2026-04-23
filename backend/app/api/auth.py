@@ -8,9 +8,16 @@ from sqlmodel import Session, select
 from app.api.deps import get_current_user
 from app.core.config import get_settings
 from app.core.db import get_session
-from app.core.security import create_access_token, utcnow
+from app.core.security import create_access_token, hash_password, utcnow, verify_password
 from app.models import PhoneCode, User
-from app.schemas import RequestCodePayload, RequestCodeResponse, TokenResponse, UserRead, VerifyCodePayload
+from app.schemas import (
+    PasswordLoginPayload,
+    RequestCodePayload,
+    RequestCodeResponse,
+    TokenResponse,
+    UserRead,
+    VerifyCodePayload,
+)
 from app.services.sms import SmsDeliveryError, send_verification_code, verify_cloud_verification_code
 
 
@@ -30,6 +37,9 @@ def request_code(payload: RequestCodePayload, session: Session = Depends(get_ses
 
     if payload.purpose == "register" and existing_user is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="该手机号已注册，请直接登录。")
+
+    if payload.purpose == "reset_password" and existing_user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="账号不存在，请先注册。")
 
     if not use_cloud_verification:
         latest_code = session.exec(
@@ -90,6 +100,12 @@ def verify_code(payload: VerifyCodePayload, session: Session = Depends(get_sessi
     if payload.purpose == "register" and user is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="该手机号已注册，请直接登录。")
 
+    if payload.purpose == "reset_password" and user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="账号不存在，请先注册。")
+
+    if payload.purpose in {"register", "reset_password"} and not payload.password:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="请设置至少 8 位登录密码。")
+
     if settings.sms_provider_normalized == "aliyun_cloud":
         try:
             is_valid_code = verify_cloud_verification_code(phone=phone, code=payload.code)
@@ -119,11 +135,33 @@ def verify_code(payload: VerifyCodePayload, session: Session = Depends(get_sessi
         session.add(code_record)
 
     if payload.purpose == "register":
-        user = User(phone=phone, display_name=payload.display_name or f"SoundTag 用户 {phone[-4:]}")
+        user = User(
+            phone=phone,
+            display_name=payload.display_name or f"SoundTag 用户 {phone[-4:]}",
+            password_hash=hash_password(payload.password or ""),
+        )
+        session.add(user)
+    elif payload.purpose == "reset_password":
+        user.password_hash = hash_password(payload.password or "")
         session.add(user)
 
     session.commit()
     session.refresh(user)
+
+    token = create_access_token(str(user.id))
+    return TokenResponse(access_token=token, user=UserRead.model_validate(user))
+
+
+@router.post("/password-login", response_model=TokenResponse)
+def password_login(payload: PasswordLoginPayload, session: Session = Depends(get_session)) -> TokenResponse:
+    phone = normalize_mainland_phone(payload.phone)
+    user = session.exec(select(User).where(User.phone == phone)).first()
+
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="账号不存在，请先注册。")
+
+    if not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="手机号或密码不正确。")
 
     token = create_access_token(str(user.id))
     return TokenResponse(access_token=token, user=UserRead.model_validate(user))

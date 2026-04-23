@@ -1,4 +1,4 @@
-export type AuthPurpose = "login" | "register";
+export type AuthPurpose = "login" | "register" | "reset_password";
 
 export type AuthUser = {
   id: string;
