@@ -1,5 +1,6 @@
 {
   "expo": {
+    "icon": "./assets/icon.png",
     "name": "SoundTag",
     "slug": "soundtag",
     "scheme": "soundtag",
@@ -7,16 +8,22 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "splash": {
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#08131d"
+      "backgroundColor": "#FBF8FC"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
+      "icon": "./assets/icon.png",
       "supportsTablet": false,
       "bundleIdentifier": "com.soundtag.mobile",
       "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
+        "NSPhotoLibraryUsageDescription": "SoundTag needs photo library access so you can add an image to a voice tag.",
         "NFCReaderUsageDescription": "SoundTag uses NFC to identify stickers and open the correct audio record.",
         "NSMicrophoneUsageDescription": "SoundTag needs microphone access to record your voice tags."
       },
@@ -28,6 +35,8 @@
       }
     },
     "android": {
+      "icon": "./assets/icon.png",
+      "usesCleartextTraffic": true,
       "package": "com.soundtag.mobile",
       "permissions": [
         "android.permission.NFC",

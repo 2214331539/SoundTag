@@ -126,6 +126,8 @@ export async function bindTag(
     title?: string;
     object_key: string;
     file_url: string;
+    image_object_key?: string;
+    image_url?: string;
     mime_type: string;
     duration_seconds: number;
     file_size?: number;

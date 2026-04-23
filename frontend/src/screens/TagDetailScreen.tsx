@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Audio } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
 import { useIsFocused } from "@react-navigation/native";
@@ -194,13 +194,22 @@ export function TagDetailScreen({ navigation, route }: Props) {
         />
       }
     >
-      <LinearGradient colors={["#184E4B", "#17413F", "#E7E5B6"]} style={styles.artwork}>
-        <View style={styles.windowShape}>
-          <View style={styles.windowPane} />
-          <View style={styles.windowPane} />
-        </View>
-        <WaveGlyph color="rgba(255,255,255,0.66)" accentColor={colors.accent} height={88} />
-      </LinearGradient>
+      <View style={styles.artwork}>
+        {latestRecord?.image_url ? (
+          <Image source={{ uri: latestRecord.image_url }} style={styles.coverImage} />
+        ) : (
+          <LinearGradient colors={["#184E4B", "#17413F", "#E7E5B6"]} style={styles.defaultArtwork}>
+            <View style={styles.windowShape}>
+              <View style={styles.windowPane} />
+              <View style={styles.windowPane} />
+            </View>
+            <View style={styles.defaultArtworkCopy}>
+              <WaveGlyph color="rgba(255,255,255,0.66)" accentColor={colors.accent} height={74} />
+              <Text style={styles.defaultArtworkHint}>可在录音时插入图片</Text>
+            </View>
+          </LinearGradient>
+        )}
+      </View>
 
       <View style={styles.titleBlock}>
         <View style={styles.categoryChip}>
@@ -284,14 +293,32 @@ const styles = StyleSheet.create({
     lineHeight: 40,
   },
   artwork: {
-    alignItems: "center",
-    justifyContent: "space-between",
     height: 372,
     borderRadius: radii.xl,
-    paddingVertical: 48,
     marginTop: 24,
     overflow: "hidden",
+    backgroundColor: colors.surfaceMid,
     ...shadows.ambient,
+  },
+  defaultArtwork: {
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    height: "100%",
+    paddingVertical: 48,
+  },
+  coverImage: {
+    width: "100%",
+    height: "100%",
+  },
+  defaultArtworkCopy: {
+    alignItems: "center",
+    gap: 16,
+  },
+  defaultArtworkHint: {
+    color: "rgba(255,255,255,0.86)",
+    fontSize: 15,
+    fontWeight: "900",
   },
   windowShape: {
     flexDirection: "row",

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Audio, type AVPlaybackStatus } from "expo-av";
+import * as ImagePicker from "expo-image-picker";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { PrimaryButton } from "../components/PrimaryButton";
@@ -9,7 +10,7 @@ import { WaveGlyph } from "../components/WaveGlyph";
 import { RootStackParamList } from "../navigation/types";
 import { bindTag, requestUploadCredential } from "../services/api";
 import { enablePlaybackMode, enableRecordingMode, playSoundWithFocusRetry } from "../services/audioMode";
-import { uploadAudioToOss } from "../services/audioUpload";
+import { uploadFileToOss } from "../services/audioUpload";
 import { colors, radii, shadows } from "../theme";
 import { formatDuration } from "../utils/format";
 
@@ -31,6 +32,7 @@ export function RecordScreen({ navigation, route }: Props) {
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const [previewPositionMs, setPreviewPositionMs] = useState(0);
   const [previewDurationMs, setPreviewDurationMs] = useState(0);
+  const [coverImageUri, setCoverImageUri] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -172,6 +174,35 @@ export function RecordScreen({ navigation, route }: Props) {
     setDurationMs(0);
   }
 
+  async function pickCoverImage() {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("需要相册权限", "请允许 SoundTag 访问相册，才能为声音添加图片。");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.82,
+      });
+
+      if (result.canceled || !result.assets[0]?.uri) {
+        return;
+      }
+
+      setCoverImageUri(result.assets[0].uri);
+    } catch (error) {
+      Alert.alert("选择图片失败", extractMessage(error));
+    }
+  }
+
+  function removeCoverImage() {
+    setCoverImageUri(null);
+  }
+
   async function togglePreviewPlayback() {
     if (!recordedUri) {
       return;
@@ -242,15 +273,32 @@ export function RecordScreen({ navigation, route }: Props) {
         mime_type,
       });
 
-      const upload = await uploadAudioToOss({
+      const upload = await uploadFileToOss({
         credential,
         file_uri: recordedUri,
       });
+
+      let imageUpload: Awaited<ReturnType<typeof uploadFileToOss>> | null = null;
+      if (coverImageUri) {
+        const imageMetadata = inferImageMetadata(coverImageUri);
+        const imageCredential = await requestUploadCredential({
+          uid,
+          file_extension: imageMetadata.extension,
+          mime_type: imageMetadata.mime_type,
+        });
+
+        imageUpload = await uploadFileToOss({
+          credential: imageCredential,
+          file_uri: coverImageUri,
+        });
+      }
 
       await bindTag(uid, {
         title,
         object_key: upload.object_key,
         file_url: upload.file_url,
+        image_object_key: imageUpload?.object_key,
+        image_url: imageUpload?.file_url,
         mime_type,
         duration_seconds: Math.max(1, Math.round((previewDurationMs || durationMs) / 1000)),
         file_size: upload.file_size,
@@ -306,6 +354,32 @@ export function RecordScreen({ navigation, route }: Props) {
           value={recordingTitle}
         />
       </View>
+
+      <Pressable onPress={() => void pickCoverImage()} style={({ pressed }) => [
+        styles.coverPicker,
+        pressed ? styles.controlPressed : null,
+      ]}>
+        {coverImageUri ? (
+          <>
+            <Image source={{ uri: coverImageUri }} style={styles.coverImage} />
+            <View style={styles.coverOverlay}>
+              <Text style={styles.coverOverlayText}>点击更换图片</Text>
+            </View>
+          </>
+        ) : (
+          <View style={styles.coverPlaceholder}>
+            <Text style={styles.coverIcon}>image</Text>
+            <Text style={styles.coverTitle}>可插入图片</Text>
+            <Text style={styles.coverHint}>点击从本机相册选择，未选择则保持默认播放封面</Text>
+          </View>
+        )}
+      </Pressable>
+
+      {coverImageUri ? (
+        <Pressable onPress={removeCoverImage} style={styles.removeCoverButton}>
+          <Text style={styles.removeCoverText}>移除图片，使用默认封面</Text>
+        </Pressable>
+      ) : null}
 
       <WaveGlyph
         active={Boolean(recording || previewPlaying)}
@@ -408,6 +482,31 @@ function inferAudioMetadata(uri: string) {
   return {
     extension,
     mime_type: "audio/mp4",
+  };
+}
+
+
+function inferImageMetadata(uri: string) {
+  const match = uri.match(/\.([a-zA-Z0-9]+)(?:\?.*)?$/);
+  const extension = (match?.[1]?.toLowerCase() ?? "jpg").replace("jpeg", "jpg");
+
+  if (extension === "png") {
+    return {
+      extension,
+      mime_type: "image/png",
+    };
+  }
+
+  if (extension === "webp") {
+    return {
+      extension,
+      mime_type: "image/webp",
+    };
+  }
+
+  return {
+    extension: "jpg",
+    mime_type: "image/jpeg",
   };
 }
 
@@ -539,6 +638,72 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     minHeight: 56,
     textAlign: "center",
+  },
+  coverPicker: {
+    alignItems: "center",
+    justifyContent: "center",
+    height: 214,
+    borderRadius: radii.xl,
+    backgroundColor: "rgba(255,255,255,0.68)",
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "rgba(85,92,130,0.32)",
+    marginTop: 24,
+    overflow: "hidden",
+    ...shadows.soft,
+  },
+  coverImage: {
+    width: "100%",
+    height: "100%",
+  },
+  coverOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    backgroundColor: "rgba(27,27,30,0.48)",
+    paddingVertical: 12,
+  },
+  coverOverlayText: {
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  coverPlaceholder: {
+    alignItems: "center",
+    paddingHorizontal: 26,
+  },
+  coverIcon: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "900",
+    letterSpacing: 1.2,
+    marginBottom: 12,
+    textTransform: "uppercase",
+  },
+  coverTitle: {
+    color: colors.text,
+    fontSize: 21,
+    fontWeight: "900",
+  },
+  coverHint: {
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 22,
+    marginTop: 8,
+    textAlign: "center",
+  },
+  removeCoverButton: {
+    alignSelf: "center",
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  removeCoverText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: "800",
   },
   wave: {
     marginTop: 52,

@@ -26,6 +26,8 @@ export type AudioRecord = {
   title?: string | null;
   object_key: string;
   file_url: string;
+  image_object_key?: string | null;
+  image_url?: string | null;
   mime_type: string;
   duration_seconds: number;
   file_size?: number | null;
@@ -49,6 +51,8 @@ export type UploadCredential = {
   upload_url: string;
   object_key: string;
   file_url: string;
+  image_object_key?: string | null;
+  image_url?: string | null;
   mime_type: string;
 };
 

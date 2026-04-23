@@ -4,16 +4,16 @@ import CryptoJS from "crypto-js";
 import { UploadCredential } from "../types";
 
 
-type UploadAudioArgs = {
+type UploadFileArgs = {
   credential: UploadCredential;
   file_uri: string;
 };
 
 
-export async function uploadAudioToOss({ credential, file_uri }: UploadAudioArgs) {
+export async function uploadFileToOss({ credential, file_uri }: UploadFileArgs) {
   const fileInfo = await FileSystem.getInfoAsync(file_uri, { size: true });
   if (!fileInfo.exists) {
-    throw new Error("录音文件不存在，无法上传。");
+    throw new Error("本地文件不存在，无法上传。");
   }
 
   const policyDocument = JSON.stringify({
@@ -55,3 +55,6 @@ export async function uploadAudioToOss({ credential, file_uri }: UploadAudioArgs
     file_size: "size" in fileInfo ? fileInfo.size : undefined,
   };
 }
+
+
+export const uploadAudioToOss = uploadFileToOss;

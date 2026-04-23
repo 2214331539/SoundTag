@@ -60,6 +60,8 @@ class AudioRecordRead(BaseModel):
     title: str | None = None
     object_key: str
     file_url: str
+    image_object_key: str | None = None
+    image_url: str | None = None
     mime_type: str
     duration_seconds: int
     file_size: int | None = None
@@ -96,6 +98,8 @@ class FinalizeUploadPayload(BaseModel):
     title: str | None = Field(default=None, max_length=100)
     object_key: str = Field(min_length=1, max_length=255)
     file_url: str = Field(min_length=1, max_length=1024)
+    image_object_key: str | None = Field(default=None, max_length=255)
+    image_url: str | None = Field(default=None, max_length=1024)
     mime_type: str = Field(min_length=3, max_length=64)
     duration_seconds: int = Field(ge=0)
     file_size: int | None = Field(default=None, ge=0)
@@ -111,6 +115,8 @@ class TimelineRecord(BaseModel):
     title: str | None = None
     object_key: str
     file_url: str
+    image_object_key: str | None = None
+    image_url: str | None = None
     mime_type: str
     duration_seconds: int
     file_size: int | None = None

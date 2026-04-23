@@ -21,6 +21,8 @@ def _serialize_timeline_record(record: AudioRecord, uid: str) -> TimelineRecord:
         title=record.title,
         object_key=record.object_key,
         file_url=build_access_url(record.object_key),
+        image_object_key=record.image_object_key,
+        image_url=build_access_url(record.image_object_key) if record.image_object_key else None,
         mime_type=record.mime_type,
         duration_seconds=record.duration_seconds,
         file_size=record.file_size,
@@ -103,6 +105,8 @@ def delete_record(
 
     try:
         delete_object(record.object_key)
+        if record.image_object_key:
+            delete_object(record.image_object_key)
     except Exception:
         pass
 

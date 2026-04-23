@@ -38,6 +38,8 @@ class AudioRecord(SQLModel, table=True):
     title: str | None = Field(default=None, max_length=100)
     object_key: str = Field(nullable=False, max_length=255)
     file_url: str = Field(nullable=False, max_length=1024)
+    image_object_key: str | None = Field(default=None, max_length=255)
+    image_url: str | None = Field(default=None, max_length=1024)
     mime_type: str = Field(nullable=False, max_length=64)
     duration_seconds: int = Field(nullable=False, ge=0)
     file_size: int | None = Field(default=None, ge=0)

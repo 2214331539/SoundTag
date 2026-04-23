@@ -32,7 +32,10 @@ def _latest_record_for_tag(session: Session, tag_id: str) -> AudioRecord | None:
 
 def _serialize_audio_record(record: AudioRecord) -> AudioRecordRead:
     payload = AudioRecordRead.model_validate(record)
-    return payload.model_copy(update={"file_url": build_access_url(record.object_key)})
+    updates = {"file_url": build_access_url(record.object_key)}
+    if record.image_object_key:
+        updates["image_url"] = build_access_url(record.image_object_key)
+    return payload.model_copy(update=updates)
 
 
 @router.get("/{uid}", response_model=TagStateResponse)
@@ -91,6 +94,8 @@ def bind_uploaded_audio(
         record.replaced_at = now
         session.add(record)
         objects_to_delete.append(record.object_key)
+        if record.image_object_key:
+            objects_to_delete.append(record.image_object_key)
 
     new_record = AudioRecord(
         tag_id=tag.id,
@@ -98,6 +103,8 @@ def bind_uploaded_audio(
         title=payload.title.strip() if payload.title else None,
         object_key=payload.object_key,
         file_url=build_public_url(payload.object_key),
+        image_object_key=payload.image_object_key,
+        image_url=build_public_url(payload.image_object_key) if payload.image_object_key else None,
         mime_type=payload.mime_type,
         duration_seconds=payload.duration_seconds,
         file_size=payload.file_size,

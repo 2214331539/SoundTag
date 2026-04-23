@@ -30,7 +30,14 @@ def main() -> None:
 
     with Session(engine) as session:
         records = session.exec(select(AudioRecord).where(AudioRecord.object_key != "")).all()
-        object_keys = list(OrderedDict.fromkeys(record.object_key for record in records if record.object_key))
+        object_keys = list(
+            OrderedDict.fromkeys(
+                object_key
+                for record in records
+                for object_key in (record.object_key, record.image_object_key)
+                if object_key
+            )
+        )
         active_records = [record for record in records if record.is_active]
 
         print(
