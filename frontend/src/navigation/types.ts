@@ -1,6 +1,9 @@
+import { NavigatorScreenParams } from "@react-navigation/native";
+
+
 export type RootStackParamList = {
   Auth: undefined;
-  MainTabs: undefined;
+  MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   Record: {
     uid: string;
     mode: "create" | "overwrite";

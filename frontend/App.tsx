@@ -6,17 +6,18 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AuthProvider } from "./src/contexts/AuthContext";
 import { AppNavigator } from "./src/navigation/AppNavigator";
+import { colors } from "./src/theme";
 
 
 const navigationTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    background: "#08131d",
-    card: "#102030",
-    primary: "#ff7b54",
-    text: "#f4f7fb",
-    border: "rgba(255, 255, 255, 0.08)",
+    background: colors.background,
+    card: colors.surface,
+    primary: colors.primary,
+    text: colors.text,
+    border: colors.outline,
   },
 };
 
@@ -26,7 +27,7 @@ export default function App() {
     <SafeAreaProvider>
       <AuthProvider>
         <NavigationContainer theme={navigationTheme}>
-          <StatusBar style="light" />
+          <StatusBar style="dark" />
           <AppNavigator />
         </NavigationContainer>
       </AuthProvider>

@@ -4,7 +4,9 @@ import { useIsFocused, useNavigation } from "@react-navigation/native";
 
 import { PrimaryButton } from "../components/PrimaryButton";
 import { ScreenShell } from "../components/ScreenShell";
+import { WaveGlyph } from "../components/WaveGlyph";
 import { deleteTimelineRecord, listTimelineRecords, renameTimelineRecord } from "../services/api";
+import { colors, radii, shadows } from "../theme";
 import { TimelineRecord } from "../types";
 import { formatDate, formatDuration } from "../utils/format";
 
@@ -106,12 +108,13 @@ export function RecordsScreen() {
   return (
     <ScreenShell
       title="我的声音"
-      subtitle="这里仅展示每张标签当前保存的声音。你可以重命名、删除，或进入详情播放和重录。"
+      subtitle="每张标签只展示当前生效的一段声音，可重命名、删除、播放或重录。"
       headerAction={
         <PrimaryButton
           label="刷新"
           onPress={() => void loadRecords()}
           variant="ghost"
+          size="sm"
           disabled={loading}
         />
       }
@@ -121,38 +124,57 @@ export function RecordsScreen() {
         contentContainerStyle={styles.listContent}
         data={records}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
+        renderItem={({ item, index }) => (
+          <View style={[styles.card, index === 0 ? styles.highlightCard : null]}>
             <Pressable
               onPress={() => navigation.navigate("TagDetail", { uid: item.uid })}
               style={({ pressed }) => [styles.cardMain, pressed ? styles.cardPressed : null]}
             >
-              <Text style={styles.title}>{item.title?.trim() || "未命名声音"}</Text>
-              <Text style={styles.meta}>
-                {formatDate(item.created_at)} · {formatDuration(item.duration_seconds)}
-              </Text>
-              <Text style={styles.hint}>点击卡片播放，或使用下方操作管理这段声音。</Text>
+              <View style={styles.iconBubble}>
+                <Text style={styles.iconText}>♪</Text>
+              </View>
+              <View style={styles.cardCopy}>
+                <Text style={styles.title}>{item.title?.trim() || "未命名声音"}</Text>
+                <Text style={styles.meta}>{formatDate(item.created_at)}</Text>
+              </View>
+              <View style={styles.durationBlock}>
+                <Text style={styles.duration}>{formatDuration(item.duration_seconds)}</Text>
+                <Text style={styles.playHint}>播放</Text>
+              </View>
             </Pressable>
+
             <View style={styles.actions}>
               <PrimaryButton
                 label="重命名"
                 onPress={() => openRename(item)}
                 variant="ghost"
+                size="sm"
                 disabled={deletingId === item.id}
+                style={styles.actionButton}
               />
               <PrimaryButton
                 label="删除"
                 onPress={() => confirmDelete(item)}
-                variant="ghost"
+                variant="danger"
+                size="sm"
                 loading={deletingId === item.id}
+                style={styles.actionButton}
               />
             </View>
           </View>
         )}
         ListEmptyComponent={
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>还没有声音</Text>
-            <Text style={styles.emptyText}>先靠近一张 NFC 标签并录制一段声音，保存后就会出现在这里。</Text>
+            <View style={styles.emptyIcon}>
+              <WaveGlyph height={54} color={colors.textSoft} accentColor={colors.textSoft} />
+            </View>
+            <Text style={styles.emptyTitle}>你还没有标记任何东西</Text>
+            <Text style={styles.emptyText}>先扫描一张 NFC 标签并录制声音，保存后就会出现在这里。</Text>
+            <PrimaryButton
+              label="开始扫描"
+              onPress={() => navigation.navigate("Home")}
+              style={styles.emptyButton}
+            />
           </View>
         }
         refreshing={loading}
@@ -170,13 +192,24 @@ export function RecordsScreen() {
               maxLength={100}
               onChangeText={setRenameTitle}
               placeholder="输入新的声音名称"
-              placeholderTextColor="rgba(244,247,251,0.35)"
+              placeholderTextColor={colors.textSoft}
               style={styles.input}
               value={renameTitle}
             />
             <View style={styles.modalActions}>
-              <PrimaryButton label="取消" onPress={closeRename} variant="ghost" disabled={renaming} />
-              <PrimaryButton label="保存名称" onPress={() => void submitRename()} loading={renaming} />
+              <PrimaryButton
+                label="取消"
+                onPress={closeRename}
+                variant="ghost"
+                disabled={renaming}
+                style={styles.modalButton}
+              />
+              <PrimaryButton
+                label="保存名称"
+                onPress={() => void submitRename()}
+                loading={renaming}
+                style={styles.modalButton}
+              />
             </View>
           </View>
         </View>
@@ -219,95 +252,155 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    paddingBottom: 24,
-    gap: 14,
+    gap: 16,
+    paddingBottom: 116,
   },
   card: {
-    borderRadius: 28,
-    padding: 20,
-    backgroundColor: "rgba(8, 20, 32, 0.88)",
+    borderRadius: radii.lg,
+    padding: 16,
+    backgroundColor: "rgba(255,255,255,0.82)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    gap: 16,
+    borderColor: "rgba(198,197,207,0.42)",
+    gap: 14,
+    ...shadows.soft,
+  },
+  highlightCard: {
+    backgroundColor: "rgba(204,211,255,0.68)",
+    borderColor: "rgba(204,211,255,0.72)",
   },
   cardMain: {
-    gap: 12,
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 14,
   },
   cardPressed: {
     transform: [{ scale: 0.99 }],
   },
+  iconBubble: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: colors.surface,
+  },
+  iconText: {
+    color: colors.primary,
+    fontSize: 26,
+    fontWeight: "900",
+  },
+  cardCopy: {
+    flex: 1,
+    gap: 5,
+  },
   title: {
-    color: "#F4F7FB",
-    fontSize: 18,
-    fontWeight: "800",
+    color: colors.text,
+    fontSize: 19,
+    fontWeight: "900",
   },
   meta: {
-    color: "#7FB8D5",
-    fontSize: 13,
+    color: colors.textMuted,
+    fontSize: 14,
     fontWeight: "600",
   },
-  hint: {
-    color: "rgba(244,247,251,0.72)",
-    fontSize: 13,
-    lineHeight: 20,
+  durationBlock: {
+    alignItems: "flex-end",
+    gap: 6,
+  },
+  duration: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: "800",
+  },
+  playHint: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "900",
   },
   actions: {
     flexDirection: "row",
     gap: 10,
   },
+  actionButton: {
+    flex: 1,
+  },
   emptyCard: {
-    borderRadius: 28,
-    padding: 22,
-    backgroundColor: "rgba(18, 50, 72, 0.72)",
+    alignItems: "center",
+    borderRadius: radii.xl,
+    padding: 28,
+    backgroundColor: "rgba(255,255,255,0.46)",
     borderWidth: 1,
-    borderColor: "rgba(127,184,213,0.18)",
-    gap: 10,
+    borderStyle: "dashed",
+    borderColor: "rgba(198,197,207,0.9)",
+    marginTop: 8,
+  },
+  emptyIcon: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: colors.surfaceMid,
+    marginBottom: 22,
+    ...shadows.soft,
   },
   emptyTitle: {
-    color: "#F4F7FB",
-    fontSize: 20,
+    color: colors.text,
+    fontSize: 22,
     fontWeight: "800",
+    textAlign: "center",
   },
   emptyText: {
-    color: "rgba(244,247,251,0.76)",
-    fontSize: 14,
-    lineHeight: 22,
+    color: colors.textMuted,
+    fontSize: 15,
+    lineHeight: 24,
+    marginTop: 10,
+    textAlign: "center",
+  },
+  emptyButton: {
+    marginTop: 22,
+    minWidth: 180,
   },
   modalBackdrop: {
     flex: 1,
     justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.64)",
+    backgroundColor: "rgba(27,27,30,0.35)",
     padding: 20,
   },
   modalCard: {
-    borderRadius: 28,
-    padding: 22,
-    backgroundColor: "#0c1a27",
+    borderRadius: radii.xl,
+    padding: 24,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(198,197,207,0.62)",
     gap: 14,
+    ...shadows.ambient,
   },
   modalTitle: {
-    color: "#F4F7FB",
-    fontSize: 22,
-    fontWeight: "800",
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: "900",
   },
   modalText: {
-    color: "rgba(244,247,251,0.76)",
-    fontSize: 14,
-    lineHeight: 20,
+    color: colors.textMuted,
+    fontSize: 15,
+    lineHeight: 24,
   },
   input: {
-    minHeight: 54,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    minHeight: 58,
+    borderRadius: radii.full,
+    backgroundColor: colors.surfaceLow,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    color: "#F4F7FB",
-    paddingHorizontal: 16,
-    fontSize: 16,
+    borderColor: colors.outline,
+    color: colors.text,
+    paddingHorizontal: 20,
+    fontSize: 17,
   },
   modalActions: {
+    flexDirection: "row",
     gap: 10,
+  },
+  modalButton: {
+    flex: 1,
   },
 });

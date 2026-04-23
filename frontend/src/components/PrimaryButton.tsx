@@ -1,4 +1,14 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleProp,
+  StyleSheet,
+  Text,
+  TextStyle,
+  ViewStyle,
+} from "react-native";
+
+import { colors, radii, shadows } from "../theme";
 
 
 type PrimaryButtonProps = {
@@ -6,7 +16,10 @@ type PrimaryButtonProps = {
   onPress: () => void;
   disabled?: boolean;
   loading?: boolean;
-  variant?: "solid" | "ghost";
+  variant?: "solid" | "ghost" | "secondary" | "danger";
+  size?: "sm" | "md" | "lg";
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
 };
 
 
@@ -16,8 +29,14 @@ export function PrimaryButton({
   disabled = false,
   loading = false,
   variant = "solid",
+  size = "md",
+  style,
+  textStyle,
 }: PrimaryButtonProps) {
   const isDisabled = disabled || loading;
+  const indicatorColor = variant === "solid" || variant === "danger" ? colors.white : colors.primary;
+  const labelSizeStyle =
+    size === "sm" ? styles.smLabel : size === "lg" ? styles.lgLabel : styles.mdLabel;
 
   return (
     <Pressable
@@ -25,15 +44,28 @@ export function PrimaryButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,
+        styles[size],
         variant === "ghost" ? styles.ghost : styles.solid,
+        variant === "secondary" ? styles.secondary : null,
+        variant === "danger" ? styles.danger : null,
         isDisabled ? styles.disabled : null,
         pressed && !isDisabled ? styles.pressed : null,
+        style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === "ghost" ? "#F4F7FB" : "#08131D"} />
+        <ActivityIndicator color={indicatorColor} />
       ) : (
-        <Text style={[styles.label, variant === "ghost" ? styles.ghostLabel : styles.solidLabel]}>
+        <Text
+          style={[
+            styles.label,
+            labelSizeStyle,
+            variant === "ghost" ? styles.ghostLabel : styles.solidLabel,
+            variant === "secondary" ? styles.secondaryLabel : null,
+            variant === "danger" ? styles.dangerLabel : null,
+            textStyle,
+          ]}
+        >
           {label}
         </Text>
       )}
@@ -44,40 +76,76 @@ export function PrimaryButton({
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: 18,
+    borderRadius: radii.full,
     alignItems: "center",
     justifyContent: "center",
+  },
+  sm: {
+    minHeight: 40,
+    paddingHorizontal: 16,
+  },
+  md: {
     minHeight: 54,
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
+  },
+  lg: {
+    minHeight: 64,
+    paddingHorizontal: 28,
   },
   solid: {
-    backgroundColor: "#FF7B54",
-    shadowColor: "#FF7B54",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.28,
-    shadowRadius: 18,
-    elevation: 6,
+    backgroundColor: colors.primary,
+    ...shadows.button,
   },
   ghost: {
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.16)",
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    borderColor: colors.outline,
+    backgroundColor: "rgba(255,255,255,0.62)",
+  },
+  secondary: {
+    backgroundColor: colors.accent,
+    shadowColor: "#E7E5B6",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+    elevation: 5,
+  },
+  danger: {
+    backgroundColor: colors.danger,
+    shadowColor: colors.danger,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 5,
   },
   disabled: {
-    opacity: 0.55,
+    opacity: 0.5,
   },
   pressed: {
     transform: [{ scale: 0.98 }],
   },
   label: {
-    fontSize: 16,
     fontWeight: "700",
     letterSpacing: 0.2,
   },
+  smLabel: {
+    fontSize: 13,
+  },
+  mdLabel: {
+    fontSize: 16,
+  },
+  lgLabel: {
+    fontSize: 18,
+  },
   solidLabel: {
-    color: "#08131D",
+    color: colors.white,
   },
   ghostLabel: {
-    color: "#F4F7FB",
+    color: colors.primary,
+  },
+  secondaryLabel: {
+    color: colors.accentStrong,
+  },
+  dangerLabel: {
+    color: colors.white,
   },
 });

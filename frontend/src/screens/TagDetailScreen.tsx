@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { Audio } from "expo-av";
+import { LinearGradient } from "expo-linear-gradient";
 import { useIsFocused } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { PrimaryButton } from "../components/PrimaryButton";
 import { ScreenShell } from "../components/ScreenShell";
+import { WaveGlyph } from "../components/WaveGlyph";
 import { RootStackParamList } from "../navigation/types";
 import { lookupTag } from "../services/api";
 import { enablePlaybackMode } from "../services/audioMode";
+import { colors, radii, shadows } from "../theme";
 import { TagState } from "../types";
 import { formatDate, formatDuration } from "../utils/format";
 
@@ -24,6 +27,8 @@ export function TagDetailScreen({ navigation, route }: Props) {
   const [tagState, setTagState] = useState<TagState | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackPositionMs, setPlaybackPositionMs] = useState(0);
+  const [playbackDurationMs, setPlaybackDurationMs] = useState(0);
 
   useEffect(() => {
     if (isFocused) {
@@ -51,17 +56,29 @@ export function TagDetailScreen({ navigation, route }: Props) {
     await unloadSound();
     await enablePlaybackMode();
 
-    const { sound } = await Audio.Sound.createAsync(
+    const { sound, status } = await Audio.Sound.createAsync(
       { uri: fileUrl },
-      { shouldPlay: true },
+      { shouldPlay: true, progressUpdateIntervalMillis: 300 },
     );
 
-    sound.setOnPlaybackStatusUpdate((status) => {
-      if (!status.isLoaded) {
+    sound.setOnPlaybackStatusUpdate((nextStatus) => {
+      if (!nextStatus.isLoaded) {
         return;
       }
-      setIsPlaying(status.isPlaying);
+
+      setIsPlaying(nextStatus.isPlaying);
+      setPlaybackPositionMs(nextStatus.positionMillis ?? 0);
+      setPlaybackDurationMs(nextStatus.durationMillis ?? 0);
+
+      if (nextStatus.didJustFinish) {
+        setIsPlaying(false);
+      }
     });
+
+    if (status.isLoaded) {
+      setPlaybackPositionMs(status.positionMillis ?? 0);
+      setPlaybackDurationMs(status.durationMillis ?? 0);
+    }
 
     soundRef.current = sound;
     setIsPlaying(true);
@@ -75,6 +92,8 @@ export function TagDetailScreen({ navigation, route }: Props) {
 
       if (response.status !== "owned" || !response.latest_record?.file_url) {
         await unloadSound();
+        setPlaybackPositionMs(0);
+        setPlaybackDurationMs(0);
         return;
       }
 
@@ -108,9 +127,15 @@ export function TagDetailScreen({ navigation, route }: Props) {
         return;
       }
 
+      const duration = status.durationMillis ?? 0;
+      const reachedEnd = duration > 0 && (status.positionMillis ?? 0) >= duration - 250;
+
       if (status.isPlaying) {
         await soundRef.current.pauseAsync();
         setIsPlaying(false);
+      } else if (reachedEnd) {
+        await soundRef.current.replayAsync();
+        setIsPlaying(true);
       } else {
         await soundRef.current.playAsync();
         setIsPlaying(true);
@@ -120,55 +145,112 @@ export function TagDetailScreen({ navigation, route }: Props) {
     }
   }
 
+  async function seekBy(deltaMs: number) {
+    try {
+      const sound = soundRef.current;
+      if (!sound) {
+        return;
+      }
+
+      const status = await sound.getStatusAsync();
+      if (!status.isLoaded) {
+        return;
+      }
+
+      const duration = status.durationMillis ?? playbackDurationMs;
+      const nextPosition = Math.max(0, Math.min((status.positionMillis ?? 0) + deltaMs, duration));
+      await sound.setPositionAsync(nextPosition);
+      setPlaybackPositionMs(nextPosition);
+    } catch (error) {
+      Alert.alert("调整进度失败", extractMessage(error));
+    }
+  }
+
   const latestRecord = tagState?.latest_record;
   const title = latestRecord?.title?.trim() || "未命名声音";
+  const fallbackDurationMs = latestRecord ? latestRecord.duration_seconds * 1000 : 0;
+  const totalMs = playbackDurationMs || fallbackDurationMs;
+  const progress = totalMs > 0 ? Math.min(playbackPositionMs / totalMs, 1) : 0;
 
   return (
     <ScreenShell
       title="播放声音"
-      subtitle="再次靠近这张标签时，会直接进入这个播放页。"
+      showPageHeader={false}
       scroll
+      headerLeading={
+        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Text style={styles.backText}>‹</Text>
+        </Pressable>
+      }
       headerAction={
         <PrimaryButton
           label="刷新"
           onPress={() => void loadTag()}
           variant="ghost"
+          size="sm"
           disabled={loading}
         />
       }
     >
-      <View style={styles.heroCard}>
-        <Text style={styles.heroLabel}>当前声音</Text>
-        <Text style={styles.heroTitle}>{loading ? "加载中..." : title}</Text>
-        <Text style={styles.heroText}>
-          这张标签已经保存了一段声音。你可以播放，也可以重新录制一段声音来替换它。
+      <LinearGradient colors={["#184E4B", "#17413F", "#E7E5B6"]} style={styles.artwork}>
+        <View style={styles.windowShape}>
+          <View style={styles.windowPane} />
+          <View style={styles.windowPane} />
+        </View>
+        <WaveGlyph color="rgba(255,255,255,0.66)" accentColor={colors.accent} height={88} />
+      </LinearGradient>
+
+      <View style={styles.titleBlock}>
+        <View style={styles.categoryChip}>
+          <Text style={styles.categoryText}>已绑定声音</Text>
+        </View>
+        <Text style={styles.title}>{loading ? "加载中..." : title}</Text>
+        <Text style={styles.date}>
+          {latestRecord ? `录制于 ${formatDate(latestRecord.created_at)}` : "这张标签还没有可播放的声音"}
         </Text>
       </View>
 
-      <View style={styles.infoCard}>
-        <Text style={styles.infoTitle}>声音信息</Text>
-        <Text style={styles.infoLine}>
-          时长：{latestRecord ? formatDuration(latestRecord.duration_seconds) : "--"}
-        </Text>
-        <Text style={styles.infoLine}>
-          保存时间：{latestRecord ? formatDate(latestRecord.created_at) : "--"}
-        </Text>
-        <Text style={styles.infoLine}>
-          状态：{latestRecord ? "已保存，可播放" : "还没有可播放的声音"}
-        </Text>
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+      </View>
+      <View style={styles.timeRow}>
+        <Text style={styles.timeText}>{formatDuration(Math.floor(playbackPositionMs / 1000))}</Text>
+        <Text style={styles.timeText}>{formatDuration(Math.floor(totalMs / 1000))}</Text>
+      </View>
+
+      <View style={styles.playControls}>
+        <Pressable onPress={() => void seekBy(-10000)} disabled={!latestRecord} style={styles.skipButton}>
+          <Text style={styles.skipText}>-10s</Text>
+        </Pressable>
+        <Pressable
+          disabled={!latestRecord}
+          onPress={() => void togglePlayback()}
+          style={({ pressed }) => [
+            styles.playButton,
+            !latestRecord ? styles.disabledButton : null,
+            pressed && latestRecord ? styles.pressed : null,
+          ]}
+        >
+          <Text style={styles.playText}>{isPlaying ? "暂停" : "播放"}</Text>
+        </Pressable>
+        <Pressable onPress={() => void seekBy(10000)} disabled={!latestRecord} style={styles.skipButton}>
+          <Text style={styles.skipText}>+10s</Text>
+        </Pressable>
       </View>
 
       <View style={styles.actions}>
-        <PrimaryButton
-          label={isPlaying ? "暂停播放" : "播放声音"}
-          onPress={() => void togglePlayback()}
-          disabled={!latestRecord}
-        />
         <PrimaryButton
           label="重新录制"
           onPress={() => navigation.navigate("Record", { uid, mode: "overwrite" })}
           variant="ghost"
           disabled={!latestRecord && tagState?.status !== "owned"}
+          style={styles.actionButton}
+        />
+        <PrimaryButton
+          label="查看我的声音"
+          onPress={() => navigation.navigate("MainTabs", { screen: "Records" })}
+          variant="secondary"
+          style={styles.actionButton}
         />
       </View>
     </ScreenShell>
@@ -186,52 +268,144 @@ function extractMessage(error: unknown) {
 
 
 const styles = StyleSheet.create({
-  heroCard: {
-    backgroundColor: "rgba(8, 20, 32, 0.88)",
-    borderRadius: 30,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    gap: 14,
+  backButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 42,
+    height: 42,
+    borderRadius: radii.full,
   },
-  heroLabel: {
-    color: "#7FB8D5",
-    fontSize: 12,
+  backText: {
+    color: colors.primary,
+    fontSize: 38,
+    fontWeight: "400",
+    lineHeight: 40,
+  },
+  artwork: {
+    alignItems: "center",
+    justifyContent: "space-between",
+    height: 372,
+    borderRadius: radii.xl,
+    paddingVertical: 48,
+    marginTop: 24,
+    overflow: "hidden",
+    ...shadows.ambient,
+  },
+  windowShape: {
+    flexDirection: "row",
+    width: 126,
+    height: 92,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.78)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.9)",
+    padding: 8,
+    gap: 8,
+  },
+  windowPane: {
+    flex: 1,
+    borderRadius: 14,
+    backgroundColor: "rgba(204,211,255,0.45)",
+  },
+  titleBlock: {
+    alignItems: "center",
+    paddingTop: 38,
+    paddingBottom: 30,
+  },
+  categoryChip: {
+    borderRadius: radii.full,
+    backgroundColor: colors.accent,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    marginBottom: 14,
+  },
+  categoryText: {
+    color: colors.accentStrong,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  title: {
+    color: colors.text,
+    fontSize: 34,
+    fontWeight: "900",
+    letterSpacing: -1,
+    textAlign: "center",
+  },
+  date: {
+    color: colors.textMuted,
+    fontSize: 17,
+    lineHeight: 26,
+    marginTop: 12,
+    textAlign: "center",
+  },
+  progressTrack: {
+    height: 14,
+    borderRadius: radii.full,
+    backgroundColor: colors.surfaceHigh,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: radii.full,
+    backgroundColor: colors.primary,
+  },
+  timeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 12,
+  },
+  timeText: {
+    color: colors.textMuted,
+    fontSize: 16,
     fontWeight: "700",
-    letterSpacing: 1.1,
   },
-  heroTitle: {
-    color: "#F4F7FB",
-    fontSize: 30,
-    fontWeight: "800",
+  playControls: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 32,
+    marginTop: 42,
   },
-  heroText: {
-    color: "rgba(244,247,251,0.76)",
-    fontSize: 14,
-    lineHeight: 22,
+  skipButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: "rgba(255,255,255,0.58)",
   },
-  infoCard: {
-    marginTop: 18,
-    borderRadius: 28,
-    padding: 20,
-    backgroundColor: "rgba(18, 50, 72, 0.72)",
-    borderWidth: 1,
-    borderColor: "rgba(127,184,213,0.18)",
-    gap: 10,
+  skipText: {
+    color: colors.textMuted,
+    fontSize: 16,
+    fontWeight: "900",
   },
-  infoTitle: {
-    color: "#F4F7FB",
-    fontSize: 20,
-    fontWeight: "800",
-    marginBottom: 2,
+  playButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    backgroundColor: colors.primary,
+    ...shadows.button,
   },
-  infoLine: {
-    color: "rgba(244,247,251,0.76)",
-    fontSize: 14,
-    lineHeight: 22,
+  playText: {
+    color: colors.white,
+    fontSize: 22,
+    fontWeight: "900",
+  },
+  disabledButton: {
+    opacity: 0.48,
+  },
+  pressed: {
+    transform: [{ scale: 0.96 }],
   },
   actions: {
-    marginTop: 18,
+    flexDirection: "row",
     gap: 12,
+    marginTop: 48,
+    marginBottom: 22,
+  },
+  actionButton: {
+    flex: 1,
   },
 });

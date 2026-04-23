@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Audio, type AVPlaybackStatus } from "expo-av";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { PrimaryButton } from "../components/PrimaryButton";
 import { ScreenShell } from "../components/ScreenShell";
+import { WaveGlyph } from "../components/WaveGlyph";
 import { RootStackParamList } from "../navigation/types";
 import { bindTag, requestUploadCredential } from "../services/api";
 import { enablePlaybackMode, enableRecordingMode } from "../services/audioMode";
 import { uploadAudioToOss } from "../services/audioUpload";
+import { colors, radii, shadows } from "../theme";
 import { formatDuration } from "../utils/format";
 
 
@@ -175,39 +177,43 @@ export function RecordScreen({ navigation, route }: Props) {
       return;
     }
 
-    let previewSound = previewSoundRef.current;
-    if (!previewSound) {
-      await preparePreview(recordedUri);
-      previewSound = previewSoundRef.current;
+    try {
+      let previewSound = previewSoundRef.current;
+      if (!previewSound) {
+        await preparePreview(recordedUri);
+        previewSound = previewSoundRef.current;
+      }
+
+      if (!previewSound) {
+        return;
+      }
+
+      const status = await previewSound.getStatusAsync();
+      if (!status.isLoaded) {
+        await preparePreview(recordedUri);
+        return;
+      }
+
+      if (status.isPlaying) {
+        await previewSound.pauseAsync();
+        setPreviewPlaying(false);
+        return;
+      }
+
+      const hasDuration = (status.durationMillis ?? 0) > 0;
+      const reachedEnd =
+        hasDuration && (status.positionMillis ?? 0) >= (status.durationMillis ?? 0) - 250;
+
+      if (reachedEnd) {
+        await previewSound.replayAsync();
+      } else {
+        await previewSound.playAsync();
+      }
+
+      setPreviewPlaying(true);
+    } catch (error) {
+      Alert.alert("试听失败", extractMessage(error));
     }
-
-    if (!previewSound) {
-      return;
-    }
-
-    const status = await previewSound.getStatusAsync();
-    if (!status.isLoaded) {
-      await preparePreview(recordedUri);
-      return;
-    }
-
-    if (status.isPlaying) {
-      await previewSound.pauseAsync();
-      setPreviewPlaying(false);
-      return;
-    }
-
-    const hasDuration = (status.durationMillis ?? 0) > 0;
-    const reachedEnd =
-      hasDuration && (status.positionMillis ?? 0) >= (status.durationMillis ?? 0) - 250;
-
-    if (reachedEnd) {
-      await previewSound.replayAsync();
-    } else {
-      await previewSound.playAsync();
-    }
-
-    setPreviewPlaying(true);
   }
 
   async function saveRecording() {
@@ -258,91 +264,123 @@ export function RecordScreen({ navigation, route }: Props) {
     }
   }
 
-  const previewLabel = previewPlaying ? "暂停试听" : "播放试听";
   const previewTotalMs = previewDurationMs || durationMs;
-  const statusText = recording
-    ? "正在录音，完成后点停止。"
-    : recordedUri
-      ? "录制完成，可先试听再上传。"
-      : "准备好了就开始录音。";
+  const progress = previewTotalMs > 0 ? Math.min(previewPositionMs / previewTotalMs, 1) : 0;
+  const timerSeconds = Math.floor((recording ? durationMs : previewTotalMs || durationMs) / 1000);
+  const statusText = recording ? "录音中..." : recordedUri ? "已录制，可试听" : "准备录音";
+  const centerLabel = recording ? "停止" : recordedUri ? (previewPlaying ? "暂停" : "试听") : "录音";
 
   return (
     <ScreenShell
       title={mode === "overwrite" ? "重新录制声音" : "录制新的声音"}
-      subtitle="这张 NFC 标签已识别，录音会自动绑定到它。"
       scroll
+      showBrandHeader={false}
+      showPageHeader={false}
     >
-      <View style={styles.panel}>
-        <Text style={styles.durationLabel}>录音时长</Text>
-        <Text style={styles.durationValue}>{formatDuration(Math.floor(durationMs / 1000))}</Text>
-        <Text style={styles.statusText}>{statusText}</Text>
-        <Text style={styles.description}>
-          先录制，再试听。确认内容没问题后，点上传保存到这张标签。
-        </Text>
+      <View style={styles.header}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.closeButton}>
+          <Text style={styles.closeText}>x</Text>
+        </Pressable>
+        <View style={styles.statusChip}>
+          <Text style={styles.statusChipText}>{statusText}</Text>
+        </View>
+        <View style={styles.headerSpacer} />
       </View>
 
-      <View style={styles.nameCard}>
-        <Text style={styles.cardTitle}>声音名称</Text>
-        <Text style={styles.cardText}>这个名称会显示在播放页和记录页，方便之后识别。</Text>
+      <View style={styles.timerWrap}>
+        <View style={styles.timerOuter} />
+        <View style={styles.timerMiddle} />
+        <View style={styles.timerCore}>
+          <Text style={styles.timerText}>{formatDuration(timerSeconds)}</Text>
+        </View>
+      </View>
+
+      <View style={styles.nameField}>
+        <Text style={styles.nameIcon}>edit</Text>
         <TextInput
           maxLength={100}
           onChangeText={setRecordingTitle}
           placeholder="例如：生日祝福、钥匙提示、旅行留言"
-          placeholderTextColor="rgba(244,247,251,0.35)"
-          style={styles.input}
+          placeholderTextColor={colors.textSoft}
+          style={styles.nameInput}
           value={recordingTitle}
         />
       </View>
 
-      <View style={styles.controlPanel}>
-        <PrimaryButton
-          label={recording ? "录音中..." : "开始录音"}
-          onPress={() => void startRecording()}
-          disabled={Boolean(recording)}
-        />
-        <PrimaryButton
-          label="停止录音"
-          onPress={() => void stopRecording()}
-          disabled={!recording}
-          variant="ghost"
-        />
-        <PrimaryButton
-          label="重录"
-          onPress={() => void resetRecording()}
+      <WaveGlyph
+        active={Boolean(recording || previewPlaying)}
+        height={104}
+        style={styles.wave}
+      />
+
+      <View style={styles.controls}>
+        <Pressable
           disabled={Boolean(recording) || !recordedUri}
-          variant="ghost"
-        />
+          onPress={() => void resetRecording()}
+          style={({ pressed }) => [
+            styles.sideControl,
+            (!recordedUri || recording) ? styles.disabledControl : null,
+            pressed && recordedUri && !recording ? styles.controlPressed : null,
+          ]}
+        >
+          <Text style={styles.sideControlText}>重录</Text>
+        </Pressable>
+
+        <Pressable
+          disabled={saving}
+          onPress={() => {
+            if (recording) {
+              void stopRecording();
+              return;
+            }
+            if (recordedUri) {
+              void togglePreviewPlayback();
+              return;
+            }
+            void startRecording();
+          }}
+          style={({ pressed }) => [styles.centerControl, pressed ? styles.controlPressed : null]}
+        >
+          <Text style={styles.centerControlText}>{centerLabel}</Text>
+        </Pressable>
+
+        <Pressable
+          disabled={!recording}
+          onPress={() => void stopRecording()}
+          style={({ pressed }) => [
+            styles.sideControl,
+            styles.stopControl,
+            !recording ? styles.disabledControl : null,
+            pressed && recording ? styles.controlPressed : null,
+          ]}
+        >
+          <Text style={styles.sideControlText}>停止</Text>
+        </Pressable>
       </View>
 
-      <View style={styles.previewCard}>
-        <Text style={styles.cardTitle}>录音预览</Text>
-        <Text style={styles.cardText}>
-          进度：{formatDuration(Math.floor(previewPositionMs / 1000))} /{" "}
-          {formatDuration(Math.floor(previewTotalMs / 1000))}
-        </Text>
-        <Text style={styles.cardText}>
-          状态：
-          {!recordedUri
-            ? "等待录音"
-            : previewPlaying
-              ? "正在试听"
-              : previewReady
-                ? "已就绪"
-                : "正在加载"}
-        </Text>
-        <PrimaryButton
-          label={previewLabel}
-          onPress={() => void togglePreviewPlayback()}
-          disabled={!recordedUri || Boolean(recording) || !previewReady}
-          variant="ghost"
-        />
-      </View>
+      {recordedUri ? (
+        <View style={styles.previewCard}>
+          <View style={styles.previewHeader}>
+            <Text style={styles.previewTitle}>录音预览</Text>
+            <Text style={styles.previewTime}>
+              {formatDuration(Math.floor(previewPositionMs / 1000))} /{" "}
+              {formatDuration(Math.floor(previewTotalMs / 1000))}
+            </Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+          </View>
+          <Text style={styles.previewHint}>确认内容没问题后，再上传并绑定到这张标签。</Text>
+        </View>
+      ) : null}
 
       <PrimaryButton
-        label={mode === "overwrite" ? "确认上传并替换原声音" : "确认上传并保存"}
+        label={mode === "overwrite" ? "确认上传并替换原声音" : "确认上传并绑定标签"}
         loading={saving}
         onPress={() => void saveRecording()}
         disabled={!recordedUri || Boolean(recording)}
+        size="lg"
+        style={styles.saveButton}
       />
     </ScreenShell>
   );
@@ -403,79 +441,196 @@ function extractMessage(error: unknown) {
 
 
 const styles = StyleSheet.create({
-  panel: {
+  header: {
     alignItems: "center",
-    backgroundColor: "rgba(8,20,32,0.88)",
-    borderRadius: 30,
-    padding: 24,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingTop: 12,
+    marginBottom: 28,
+  },
+  closeButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 48,
+    height: 48,
+    borderRadius: radii.full,
+    backgroundColor: "rgba(240,237,240,0.86)",
+    ...shadows.soft,
+  },
+  closeText: {
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: "500",
+    lineHeight: 26,
+  },
+  statusChip: {
+    borderRadius: radii.full,
+    backgroundColor: "rgba(240,237,240,0.92)",
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+    ...shadows.soft,
+  },
+  statusChipText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  headerSpacer: {
+    width: 48,
+  },
+  timerWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    height: 320,
+    marginTop: 2,
+  },
+  timerOuter: {
+    position: "absolute",
+    width: 292,
+    height: 292,
+    borderRadius: 146,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    gap: 10,
+    borderColor: "rgba(204,211,255,0.38)",
   },
-  durationLabel: {
-    color: "#7FB8D5",
-    fontSize: 12,
+  timerMiddle: {
+    position: "absolute",
+    width: 246,
+    height: 246,
+    borderRadius: 123,
+    backgroundColor: "rgba(240,237,240,0.46)",
+    borderWidth: 3,
+    borderColor: "rgba(204,211,255,0.52)",
+  },
+  timerCore: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 206,
+    height: 206,
+    borderRadius: 103,
+    backgroundColor: "rgba(251,248,252,0.82)",
+    ...shadows.soft,
+  },
+  timerText: {
+    color: colors.primary,
+    fontSize: 46,
     fontWeight: "700",
-    letterSpacing: 1.1,
+    letterSpacing: -1,
   },
-  durationValue: {
-    color: "#FFFFFF",
-    fontSize: 48,
+  nameField: {
+    alignItems: "center",
+    flexDirection: "row",
+    minHeight: 72,
+    borderRadius: radii.lg,
+    backgroundColor: "rgba(240,237,240,0.9)",
+    paddingHorizontal: 20,
+    gap: 14,
+    ...shadows.soft,
+  },
+  nameIcon: {
+    color: colors.textSoft,
+    fontSize: 13,
     fontWeight: "800",
-    letterSpacing: 1,
+    letterSpacing: 0.6,
   },
-  statusText: {
-    color: "#FFB49C",
-    fontSize: 14,
+  nameInput: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 20,
     fontWeight: "700",
-  },
-  description: {
-    color: "rgba(244,247,251,0.74)",
-    fontSize: 14,
-    lineHeight: 22,
+    minHeight: 56,
     textAlign: "center",
   },
-  nameCard: {
-    marginTop: 18,
-    borderRadius: 28,
-    padding: 20,
-    backgroundColor: "rgba(18, 50, 72, 0.72)",
-    borderWidth: 1,
-    borderColor: "rgba(127,184,213,0.18)",
-    gap: 12,
+  wave: {
+    marginTop: 52,
+    marginBottom: 46,
   },
-  cardTitle: {
-    color: "#F4F7FB",
+  controls: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 28,
+  },
+  sideControl: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: "rgba(240,237,240,0.9)",
+    ...shadows.soft,
+  },
+  stopControl: {
+    backgroundColor: "rgba(204,211,255,0.78)",
+  },
+  sideControlText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  centerControl: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 122,
+    height: 122,
+    borderRadius: 61,
+    backgroundColor: colors.primary,
+    ...shadows.button,
+  },
+  centerControlText: {
+    color: colors.white,
+    fontSize: 22,
+    fontWeight: "900",
+  },
+  disabledControl: {
+    opacity: 0.42,
+  },
+  controlPressed: {
+    transform: [{ scale: 0.96 }],
+  },
+  previewCard: {
+    borderRadius: radii.lg,
+    backgroundColor: "rgba(255,255,255,0.74)",
+    borderWidth: 1,
+    borderColor: "rgba(198,197,207,0.42)",
+    padding: 18,
+    marginTop: 36,
+    ...shadows.soft,
+  },
+  previewHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  previewTitle: {
+    color: colors.text,
     fontSize: 18,
     fontWeight: "800",
   },
-  cardText: {
-    color: "rgba(244,247,251,0.76)",
+  previewTime: {
+    color: colors.textMuted,
     fontSize: 14,
-    lineHeight: 20,
+    fontWeight: "700",
   },
-  input: {
-    minHeight: 54,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    color: "#F4F7FB",
-    paddingHorizontal: 16,
-    fontSize: 16,
+  progressTrack: {
+    height: 12,
+    borderRadius: radii.full,
+    backgroundColor: colors.surfaceHigh,
+    overflow: "hidden",
+    marginTop: 16,
   },
-  controlPanel: {
-    marginTop: 18,
-    gap: 12,
+  progressFill: {
+    height: "100%",
+    borderRadius: radii.full,
+    backgroundColor: colors.primary,
   },
-  previewCard: {
-    marginTop: 18,
+  previewHint: {
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 22,
+    marginTop: 14,
+  },
+  saveButton: {
+    marginTop: 22,
     marginBottom: 18,
-    borderRadius: 28,
-    padding: 20,
-    backgroundColor: "rgba(10, 22, 34, 0.88)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    gap: 12,
   },
 });

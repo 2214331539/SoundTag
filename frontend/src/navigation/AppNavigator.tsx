@@ -8,6 +8,7 @@ import { HomeScreen } from "../screens/HomeScreen";
 import { RecordScreen } from "../screens/RecordScreen";
 import { RecordsScreen } from "../screens/RecordsScreen";
 import { TagDetailScreen } from "../screens/TagDetailScreen";
+import { colors, radii, shadows } from "../theme";
 import { MainTabParamList, RootStackParamList } from "./types";
 
 
@@ -21,16 +22,18 @@ function MainTabs() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: "#FF7B54",
-        tabBarInactiveTintColor: "rgba(244, 247, 251, 0.5)",
+        tabBarActiveTintColor: "#4338CA",
+        tabBarInactiveTintColor: "#9AA4B8",
         tabBarLabelStyle: styles.tabLabel,
+        tabBarItemStyle: styles.tabItem,
       }}
     >
       <Tab.Screen
         name="Home"
         component={HomeScreen}
         options={{
-          title: "靠近标签",
+          title: "扫一扫",
+          tabBarIcon: ({ focused }) => <TabIcon focused={focused} icon="NFC" />,
         }}
       />
       <Tab.Screen
@@ -38,6 +41,7 @@ function MainTabs() {
         component={RecordsScreen}
         options={{
           title: "我的声音",
+          tabBarIcon: ({ focused }) => <TabIcon focused={focused} icon="♪" />,
         }}
       />
     </Tab.Navigator>
@@ -45,10 +49,19 @@ function MainTabs() {
 }
 
 
+function TabIcon({ focused, icon }: { focused: boolean; icon: string }) {
+  return (
+    <View style={[styles.tabIcon, focused ? styles.tabIconActive : null]}>
+      <Text style={[styles.tabIconText, focused ? styles.tabIconTextActive : null]}>{icon}</Text>
+    </View>
+  );
+}
+
+
 function SplashScreen() {
   return (
     <View style={styles.splash}>
-      <ActivityIndicator color="#FF7B54" size="large" />
+      <ActivityIndicator color={colors.primary} size="large" />
       <Text style={styles.splashText}>正在恢复 SoundTag 会话...</Text>
     </View>
   );
@@ -67,7 +80,7 @@ export function AppNavigator() {
       screenOptions={{
         headerShown: false,
         contentStyle: {
-          backgroundColor: "#08131d",
+          backgroundColor: colors.background,
         },
       }}
     >
@@ -90,22 +103,51 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#08131d",
+    backgroundColor: colors.background,
     gap: 12,
   },
   splashText: {
-    color: "#F4F7FB",
+    color: colors.textMuted,
     fontSize: 15,
   },
   tabBar: {
-    backgroundColor: "#0c1a27",
-    borderTopColor: "rgba(255,255,255,0.08)",
-    height: 72,
-    paddingBottom: 10,
-    paddingTop: 8,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 88,
+    paddingBottom: 18,
+    paddingTop: 10,
+    backgroundColor: "rgba(255,255,255,0.94)",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(204,211,255,0.45)",
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    ...shadows.ambient,
   },
   tabLabel: {
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  tabItem: {
+    paddingTop: 2,
+  },
+  tabIcon: {
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 64,
+    minHeight: 36,
+    borderRadius: radii.full,
+  },
+  tabIconActive: {
+    backgroundColor: "rgba(204,211,255,0.42)",
+  },
+  tabIconText: {
+    color: "#9AA4B8",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  tabIconTextActive: {
+    color: "#4338CA",
   },
 });

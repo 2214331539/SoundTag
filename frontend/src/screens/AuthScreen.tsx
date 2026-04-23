@@ -3,7 +3,9 @@ import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { PrimaryButton } from "../components/PrimaryButton";
 import { ScreenShell } from "../components/ScreenShell";
+import { WaveGlyph } from "../components/WaveGlyph";
 import { useAuth } from "../contexts/AuthContext";
+import { colors, radii, shadows } from "../theme";
 
 
 export function AuthScreen() {
@@ -41,48 +43,62 @@ export function AuthScreen() {
   }
 
   return (
-    <ScreenShell
-      title="给实体物品贴一段声音"
-      subtitle="MVP 默认使用手机号验证码登录。后端开启 DEBUG_EXPOSE_OTP 后，页面会显示调试验证码，便于联调。"
-      scroll
-    >
-      <View style={styles.panel}>
-        <Text style={styles.panelTitle}>身份认证</Text>
-        <Text style={styles.panelText}>
-          录音绑定、标签覆写和个人记录列表都依赖当前账号。先登录，再开始扫描 NFC 标签。
-        </Text>
+    <ScreenShell title="欢迎来到 SoundTag" scroll showPageHeader={false}>
+      <View style={styles.hero}>
+        <View style={styles.soundMark}>
+          <WaveGlyph height={58} color={colors.primary} accentColor={colors.primary} />
+        </View>
+        <Text style={styles.title}>欢迎来到 SoundTag</Text>
+        <Text style={styles.subtitle}>请输入手机号以安全登录</Text>
+      </View>
 
-        <Text style={styles.fieldLabel}>手机号</Text>
-        <TextInput
-          autoCapitalize="none"
-          keyboardType="phone-pad"
-          onChangeText={setPhone}
-          placeholder="+8613800138000"
-          placeholderTextColor="rgba(244,247,251,0.35)"
-          style={styles.input}
-          value={phone}
+      <View style={styles.form}>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>手机号</Text>
+          <View style={styles.phoneField}>
+            <Text style={styles.countryCode}>+86</Text>
+            <View style={styles.divider} />
+            <TextInput
+              autoCapitalize="none"
+              keyboardType="phone-pad"
+              onChangeText={setPhone}
+              placeholder="手机号"
+              placeholderTextColor={colors.textSoft}
+              style={styles.phoneInput}
+              value={phone}
+            />
+          </View>
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>昵称</Text>
+          <TextInput
+            onChangeText={setDisplayName}
+            placeholder="我的 SoundTag"
+            placeholderTextColor={colors.textSoft}
+            style={styles.input}
+            value={displayName}
+          />
+        </View>
+
+        <PrimaryButton
+          label="获取验证码  ->"
+          loading={requesting}
+          onPress={handleRequestCode}
+          size="lg"
         />
 
-        <Text style={styles.fieldLabel}>昵称（可选）</Text>
-        <TextInput
-          onChangeText={setDisplayName}
-          placeholder="我的 SoundTag"
-          placeholderTextColor="rgba(244,247,251,0.35)"
-          style={styles.input}
-          value={displayName}
-        />
-
-        <PrimaryButton label="获取验证码" loading={requesting} onPress={handleRequestCode} />
-
-        <Text style={styles.fieldLabel}>验证码</Text>
-        <TextInput
-          keyboardType="number-pad"
-          onChangeText={setCode}
-          placeholder="输入 6 位验证码"
-          placeholderTextColor="rgba(244,247,251,0.35)"
-          style={styles.input}
-          value={code}
-        />
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>验证码</Text>
+          <TextInput
+            keyboardType="number-pad"
+            onChangeText={setCode}
+            placeholder="输入 6 位验证码"
+            placeholderTextColor={colors.textSoft}
+            style={styles.input}
+            value={code}
+          />
+        </View>
 
         {debugCode ? (
           <View style={styles.debugCard}>
@@ -92,11 +108,14 @@ export function AuthScreen() {
         ) : null}
 
         <PrimaryButton
-          label="登录并进入 SoundTag"
+          label="登录并进入"
           loading={verifying}
           onPress={handleVerifyCode}
+          variant="secondary"
         />
       </View>
+
+      <Text style={styles.agreement}>登录即代表同意 用户协议 和 隐私政策</Text>
     </ScreenShell>
   );
 }
@@ -112,60 +131,113 @@ function extractMessage(error: unknown) {
 
 
 const styles = StyleSheet.create({
-  panel: {
-    backgroundColor: "rgba(10, 22, 34, 0.86)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    borderRadius: 28,
-    padding: 22,
-    gap: 14,
+  hero: {
+    alignItems: "center",
+    paddingTop: 86,
+    paddingBottom: 42,
   },
-  panelTitle: {
-    color: "#F4F7FB",
-    fontSize: 22,
+  soundMark: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 112,
+    height: 112,
+    borderRadius: radii.full,
+    backgroundColor: colors.surfaceMid,
+    marginBottom: 42,
+    ...shadows.soft,
+  },
+  title: {
+    color: colors.text,
+    fontSize: 32,
     fontWeight: "800",
+    letterSpacing: -1,
+    textAlign: "center",
   },
-  panelText: {
-    color: "rgba(244,247,251,0.76)",
-    fontSize: 14,
-    lineHeight: 22,
+  subtitle: {
+    color: colors.textMuted,
+    fontSize: 18,
+    lineHeight: 28,
+    marginTop: 12,
+    textAlign: "center",
   },
-  fieldLabel: {
-    color: "#7FB8D5",
-    fontSize: 12,
+  form: {
+    gap: 18,
+  },
+  inputGroup: {
+    gap: 8,
+  },
+  label: {
+    color: colors.textMuted,
+    fontSize: 13,
     fontWeight: "700",
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    marginTop: 6,
+    paddingLeft: 8,
+  },
+  phoneField: {
+    alignItems: "center",
+    flexDirection: "row",
+    minHeight: 64,
+    borderRadius: radii.full,
+    backgroundColor: "rgba(240,237,240,0.88)",
+    borderWidth: 1,
+    borderColor: "rgba(198,197,207,0.7)",
+    paddingHorizontal: 22,
+    ...shadows.soft,
+  },
+  countryCode: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "700",
+    minWidth: 48,
+  },
+  divider: {
+    width: 1,
+    height: 34,
+    backgroundColor: "rgba(198,197,207,0.82)",
+    marginHorizontal: 18,
+  },
+  phoneInput: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 18,
+    minHeight: 54,
   },
   input: {
-    minHeight: 54,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    minHeight: 60,
+    borderRadius: radii.full,
+    backgroundColor: "rgba(240,237,240,0.88)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    color: "#F4F7FB",
-    paddingHorizontal: 16,
-    fontSize: 16,
+    borderColor: "rgba(198,197,207,0.7)",
+    color: colors.text,
+    paddingHorizontal: 22,
+    fontSize: 17,
+    ...shadows.soft,
   },
   debugCard: {
-    backgroundColor: "rgba(255,123,84,0.12)",
-    borderRadius: 18,
-    padding: 16,
+    alignItems: "center",
+    borderRadius: radii.lg,
+    padding: 18,
+    backgroundColor: "rgba(204,211,255,0.48)",
     borderWidth: 1,
-    borderColor: "rgba(255,123,84,0.2)",
+    borderColor: "rgba(85,92,130,0.12)",
   },
   debugLabel: {
-    color: "#FFB49C",
+    color: colors.primary,
     fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    marginBottom: 6,
+    fontWeight: "800",
+    letterSpacing: 1,
   },
   debugValue: {
-    color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "800",
-    letterSpacing: 4,
+    color: colors.primaryText,
+    fontSize: 28,
+    fontWeight: "900",
+    letterSpacing: 5,
+    marginTop: 8,
+  },
+  agreement: {
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 22,
+    marginTop: 34,
+    textAlign: "center",
   },
 });
