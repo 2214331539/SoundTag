@@ -8,7 +8,7 @@ import { ScreenShell } from "../components/ScreenShell";
 import { WaveGlyph } from "../components/WaveGlyph";
 import { RootStackParamList } from "../navigation/types";
 import { bindTag, requestUploadCredential } from "../services/api";
-import { enablePlaybackMode, enableRecordingMode } from "../services/audioMode";
+import { enablePlaybackMode, enableRecordingMode, playSoundWithFocusRetry } from "../services/audioMode";
 import { uploadAudioToOss } from "../services/audioUpload";
 import { colors, radii, shadows } from "../theme";
 import { formatDuration } from "../utils/format";
@@ -205,9 +205,9 @@ export function RecordScreen({ navigation, route }: Props) {
         hasDuration && (status.positionMillis ?? 0) >= (status.durationMillis ?? 0) - 250;
 
       if (reachedEnd) {
-        await previewSound.replayAsync();
+        await playSoundWithFocusRetry(previewSound, true);
       } else {
-        await previewSound.playAsync();
+        await playSoundWithFocusRetry(previewSound);
       }
 
       setPreviewPlaying(true);

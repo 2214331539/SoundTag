@@ -10,7 +10,7 @@ import { ScreenShell } from "../components/ScreenShell";
 import { WaveGlyph } from "../components/WaveGlyph";
 import { RootStackParamList } from "../navigation/types";
 import { lookupTag } from "../services/api";
-import { enablePlaybackMode } from "../services/audioMode";
+import { enablePlaybackMode, playSoundWithFocusRetry } from "../services/audioMode";
 import { colors, radii, shadows } from "../theme";
 import { TagState } from "../types";
 import { formatDate, formatDuration } from "../utils/format";
@@ -46,6 +46,7 @@ export function TagDetailScreen({ navigation, route }: Props) {
 
   async function unloadSound() {
     if (soundRef.current) {
+      soundRef.current.setOnPlaybackStatusUpdate(null);
       await soundRef.current.unloadAsync().catch(() => undefined);
       soundRef.current = null;
       setIsPlaying(false);
@@ -58,7 +59,7 @@ export function TagDetailScreen({ navigation, route }: Props) {
 
     const { sound, status } = await Audio.Sound.createAsync(
       { uri: fileUrl },
-      { shouldPlay: true, progressUpdateIntervalMillis: 300 },
+      { shouldPlay: false, progressUpdateIntervalMillis: 300 },
     );
 
     sound.setOnPlaybackStatusUpdate((nextStatus) => {
@@ -81,6 +82,7 @@ export function TagDetailScreen({ navigation, route }: Props) {
     }
 
     soundRef.current = sound;
+    await playSoundWithFocusRetry(sound);
     setIsPlaying(true);
   }
 
@@ -134,10 +136,10 @@ export function TagDetailScreen({ navigation, route }: Props) {
         await soundRef.current.pauseAsync();
         setIsPlaying(false);
       } else if (reachedEnd) {
-        await soundRef.current.replayAsync();
+        await playSoundWithFocusRetry(soundRef.current, true);
         setIsPlaying(true);
       } else {
-        await soundRef.current.playAsync();
+        await playSoundWithFocusRetry(soundRef.current);
         setIsPlaying(true);
       }
     } catch (error) {
