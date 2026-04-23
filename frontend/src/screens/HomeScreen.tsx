@@ -14,22 +14,23 @@ export function HomeScreen() {
   const { user, logout } = useAuth();
 
   const [manualUid, setManualUid] = useState("04AABBCCDD66");
-  const [lastUid, setLastUid] = useState<string | null>(null);
+  const [lastAction, setLastAction] = useState("等待识别");
   const [busy, setBusy] = useState(false);
 
   async function routeByUid(uid: string) {
     const cleanUid = uid.replace(/[^0-9A-Za-z]/g, "").toUpperCase();
     if (!cleanUid) {
-      Alert.alert("UID 无效", "请输入或扫描有效的 NFC 标签 UID。");
+      Alert.alert("没有识别到标签", "请重新靠近 NFC 标签，或检查输入的调试标签码。");
       return;
     }
 
     setBusy(true);
-    setLastUid(cleanUid);
+    setLastAction("正在识别标签...");
 
     try {
       const tag = await lookupTag(cleanUid);
       if (tag.status === "new") {
+        setLastAction("新标签，进入录音");
         navigation.navigate("Record", {
           uid: cleanUid,
           mode: "create",
@@ -38,15 +39,18 @@ export function HomeScreen() {
       }
 
       if (tag.status === "owned") {
+        setLastAction("已有声音，进入播放");
         navigation.navigate("TagDetail", {
           uid: cleanUid,
         });
         return;
       }
 
-      Alert.alert("当前账号无权限", "该标签已经被其他账号绑定，MVP 阶段默认不开放跨账号播放。");
+      setLastAction("标签不可用");
+      Alert.alert("无法使用这张标签", "这张标签已绑定到其他账号，当前账号不能播放或覆盖。");
     } catch (error) {
-      Alert.alert("查询失败", extractMessage(error));
+      setLastAction("识别失败");
+      Alert.alert("识别失败", extractMessage(error));
     } finally {
       setBusy(false);
     }
@@ -54,10 +58,15 @@ export function HomeScreen() {
 
   async function handleScan() {
     try {
+      setBusy(true);
+      setLastAction("请将手机靠近 NFC 标签");
       const uid = await scanTagUid();
       await routeByUid(uid);
     } catch (error) {
+      setLastAction("扫描失败");
       Alert.alert("扫描失败", extractMessage(error));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -67,45 +76,39 @@ export function HomeScreen() {
 
   return (
     <ScreenShell
-      title="扫描你的随声贴"
-      subtitle="识别 NTAG213 标签 UID 后，系统会自动路由到新建录音或播放详情。Expo Go 不支持此 NFC 原生能力，请使用 Dev Client。"
+      title="靠近标签"
+      subtitle="新标签会直接进入录音；已经有声音的标签会直接播放。"
       headerAction={<PrimaryButton label="退出" onPress={handleLogout} variant="ghost" />}
     >
       <View style={styles.heroCard}>
         <Text style={styles.heroLabel}>当前账号</Text>
         <Text style={styles.heroTitle}>{user?.display_name || user?.phone}</Text>
         <Text style={styles.heroText}>
-          将手机靠近 NFC 贴纸，SoundTag 会读取 UID，并根据后端绑定状态决定下一步动作。
+          把手机靠近 NFC 标签。SoundTag 只读取标签编号，不要求标签里已有内容；空白新标签也可以直接开始录音。
         </Text>
 
-        <View style={styles.metricRow}>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricValue}>{lastUid ?? "--"}</Text>
-            <Text style={styles.metricLabel}>最近 UID</Text>
-          </View>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricValue}>NFC</Text>
-            <Text style={styles.metricLabel}>扫描入口</Text>
-          </View>
+        <View style={styles.statusCard}>
+          <Text style={styles.statusValue}>{lastAction}</Text>
+          <Text style={styles.statusLabel}>最近状态</Text>
         </View>
 
-        <PrimaryButton label="开始扫描 NFC 标签" loading={busy} onPress={handleScan} />
+        <PrimaryButton label="扫描 NFC 标签" loading={busy} onPress={handleScan} />
       </View>
 
       <View style={styles.devCard}>
-        <Text style={styles.devTitle}>开发态手动 UID 路由</Text>
+        <Text style={styles.devTitle}>开发调试入口</Text>
         <Text style={styles.devText}>
-          模拟器没有 NFC 时，可以直接输入一个 UID 继续调试录音、上传、绑定和播放链路。
+          真机 NFC 不方便测试时，可以输入标签码模拟一次识别。正式使用时用户不会看到标签码。
         </Text>
         <TextInput
           autoCapitalize="characters"
           onChangeText={setManualUid}
-          placeholder="04AABBCCDD66"
+          placeholder="调试标签码"
           placeholderTextColor="rgba(244,247,251,0.35)"
           style={styles.input}
           value={manualUid}
         />
-        <PrimaryButton label="按 UID 进入" onPress={() => void routeByUid(manualUid)} variant="ghost" />
+        <PrimaryButton label="模拟识别标签" onPress={() => void routeByUid(manualUid)} variant="ghost" />
       </View>
     </ScreenShell>
   );
@@ -117,7 +120,7 @@ function extractMessage(error: unknown) {
     return String(error.message);
   }
 
-  return "请确认接口服务已经启动。";
+  return "请确认 NFC 已开启，手机靠近标签的芯片区域，并且后端服务可访问。";
 }
 
 
@@ -135,7 +138,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.1,
-    textTransform: "uppercase",
   },
   heroTitle: {
     color: "#F4F7FB",
@@ -147,26 +149,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
   },
-  metricRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  metricCard: {
-    flex: 1,
+  statusCard: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 20,
     padding: 16,
-    gap: 10,
+    gap: 8,
   },
-  metricValue: {
+  statusValue: {
     color: "#FFFFFF",
-    fontSize: 17,
-    fontWeight: "700",
+    fontSize: 18,
+    fontWeight: "800",
   },
-  metricLabel: {
+  statusLabel: {
     color: "rgba(244,247,251,0.54)",
     fontSize: 12,
-    textTransform: "uppercase",
     letterSpacing: 0.8,
   },
   devCard: {

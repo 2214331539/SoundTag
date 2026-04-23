@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
 import { Audio, type AVPlaybackStatus } from "expo-av";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 
@@ -7,6 +7,7 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { ScreenShell } from "../components/ScreenShell";
 import { RootStackParamList } from "../navigation/types";
 import { bindTag, requestUploadCredential } from "../services/api";
+import { enablePlaybackMode, enableRecordingMode } from "../services/audioMode";
 import { uploadAudioToOss } from "../services/audioUpload";
 import { formatDuration } from "../utils/format";
 
@@ -19,6 +20,7 @@ export function RecordScreen({ navigation, route }: Props) {
   const recordingRef = useRef<Audio.Recording | null>(null);
   const previewSoundRef = useRef<Audio.Sound | null>(null);
 
+  const [recordingTitle, setRecordingTitle] = useState("我的声音");
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [durationMs, setDurationMs] = useState(0);
@@ -82,10 +84,7 @@ export function RecordScreen({ navigation, route }: Props) {
 
   async function preparePreview(uri: string) {
     await unloadPreviewSound();
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
-      playsInSilentModeIOS: true,
-    });
+    await enablePlaybackMode();
 
     const { sound, status } = await Audio.Sound.createAsync(
       { uri },
@@ -110,15 +109,12 @@ export function RecordScreen({ navigation, route }: Props) {
     try {
       const permission = await Audio.requestPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert("权限不足", "请先授予麦克风权限。");
+        Alert.alert("需要麦克风权限", "请先允许 SoundTag 使用麦克风。");
         return;
       }
 
       await unloadPreviewSound();
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
+      await enableRecordingMode();
 
       const nextRecording = new Audio.Recording();
       nextRecording.setProgressUpdateInterval(250);
@@ -150,17 +146,14 @@ export function RecordScreen({ navigation, route }: Props) {
       const uri = activeRecording.getURI();
 
       if (!uri) {
-        throw new Error("录音文件路径为空。");
+        throw new Error("没有找到录音文件，请重录一次。");
       }
 
       const nextDurationMs = status.durationMillis ?? durationMs;
       setDurationMs(nextDurationMs);
       setRecordedUri(uri);
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-      });
+      await enablePlaybackMode();
       await preparePreview(uri);
     } catch (error) {
       Alert.alert("停止录音失败", extractMessage(error));
@@ -219,7 +212,13 @@ export function RecordScreen({ navigation, route }: Props) {
 
   async function saveRecording() {
     if (!recordedUri) {
-      Alert.alert("还没有录音", "请先录制一段音频。");
+      Alert.alert("还没有录音", "请先录制一段声音。");
+      return;
+    }
+
+    const title = recordingTitle.trim();
+    if (!title) {
+      Alert.alert("请填写名称", "给这段声音取一个容易识别的名字。");
       return;
     }
 
@@ -243,6 +242,7 @@ export function RecordScreen({ navigation, route }: Props) {
       });
 
       await bindTag(uid, {
+        title,
         object_key: upload.object_key,
         file_url: upload.file_url,
         mime_type,
@@ -261,24 +261,37 @@ export function RecordScreen({ navigation, route }: Props) {
   const previewLabel = previewPlaying ? "暂停试听" : "播放试听";
   const previewTotalMs = previewDurationMs || durationMs;
   const statusText = recording
-    ? "正在录音，请完成后停止。"
+    ? "正在录音，完成后点停止。"
     : recordedUri
       ? "录制完成，可先试听再上传。"
-      : "等待开始录音。";
+      : "准备好了就开始录音。";
 
   return (
     <ScreenShell
-      title={mode === "overwrite" ? "重新录音覆盖标签" : "创建新的声音标签"}
-      subtitle={`UID: ${uid}`}
+      title={mode === "overwrite" ? "重新录制声音" : "录制新的声音"}
+      subtitle="这张 NFC 标签已识别，录音会自动绑定到它。"
       scroll
     >
       <View style={styles.panel}>
-        <Text style={styles.durationLabel}>当前录音时长</Text>
+        <Text style={styles.durationLabel}>录音时长</Text>
         <Text style={styles.durationValue}>{formatDuration(Math.floor(durationMs / 1000))}</Text>
         <Text style={styles.statusText}>{statusText}</Text>
         <Text style={styles.description}>
-          停止录音后，先在本地试听结果；确认没有问题，再上传并绑定到当前标签。
+          先录制，再试听。确认内容没问题后，点上传保存到这张标签。
         </Text>
+      </View>
+
+      <View style={styles.nameCard}>
+        <Text style={styles.cardTitle}>声音名称</Text>
+        <Text style={styles.cardText}>这个名称会显示在播放页和记录页，方便之后识别。</Text>
+        <TextInput
+          maxLength={100}
+          onChangeText={setRecordingTitle}
+          placeholder="例如：生日祝福、钥匙提示、旅行留言"
+          placeholderTextColor="rgba(244,247,251,0.35)"
+          style={styles.input}
+          value={recordingTitle}
+        />
       </View>
 
       <View style={styles.controlPanel}>
@@ -301,32 +314,21 @@ export function RecordScreen({ navigation, route }: Props) {
         />
       </View>
 
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>录音摘要</Text>
-        <Text style={styles.summaryLine}>
-          状态：{recordedUri ? "已完成录音，可试听和上传" : "等待录音"}
-        </Text>
-        <Text style={styles.summaryLine}>
-          模式：{mode === "overwrite" ? "覆盖已有录音" : "首次绑定标签"}
-        </Text>
-        <Text style={styles.summaryLine}>文件：{recordedUri ?? "--"}</Text>
-      </View>
-
       <View style={styles.previewCard}>
-        <Text style={styles.previewTitle}>录音预览</Text>
-        <Text style={styles.previewLine}>
-          试听进度：{formatDuration(Math.floor(previewPositionMs / 1000))} /{" "}
+        <Text style={styles.cardTitle}>录音预览</Text>
+        <Text style={styles.cardText}>
+          进度：{formatDuration(Math.floor(previewPositionMs / 1000))} /{" "}
           {formatDuration(Math.floor(previewTotalMs / 1000))}
         </Text>
-        <Text style={styles.previewLine}>
-          试听状态：
+        <Text style={styles.cardText}>
+          状态：
           {!recordedUri
             ? "等待录音"
             : previewPlaying
               ? "正在试听"
               : previewReady
-                ? "已加载，可播放"
-                : "正在加载本地录音"}
+                ? "已就绪"
+                : "正在加载"}
         </Text>
         <PrimaryButton
           label={previewLabel}
@@ -337,7 +339,7 @@ export function RecordScreen({ navigation, route }: Props) {
       </View>
 
       <PrimaryButton
-        label={mode === "overwrite" ? "确认上传并覆盖标签" : "确认上传并绑定标签"}
+        label={mode === "overwrite" ? "确认上传并替换原声音" : "确认上传并保存"}
         loading={saving}
         onPress={() => void saveRecording()}
         disabled={!recordedUri || Boolean(recording)}
@@ -415,7 +417,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.1,
-    textTransform: "uppercase",
   },
   durationValue: {
     color: "#FFFFFF",
@@ -434,11 +435,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     textAlign: "center",
   },
-  controlPanel: {
-    marginTop: 18,
-    gap: 12,
-  },
-  summaryCard: {
+  nameCard: {
     marginTop: 18,
     borderRadius: 28,
     padding: 20,
@@ -447,15 +444,29 @@ const styles = StyleSheet.create({
     borderColor: "rgba(127,184,213,0.18)",
     gap: 12,
   },
-  summaryTitle: {
+  cardTitle: {
     color: "#F4F7FB",
     fontSize: 18,
     fontWeight: "800",
   },
-  summaryLine: {
+  cardText: {
     color: "rgba(244,247,251,0.76)",
     fontSize: 14,
     lineHeight: 20,
+  },
+  input: {
+    minHeight: 54,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    color: "#F4F7FB",
+    paddingHorizontal: 16,
+    fontSize: 16,
+  },
+  controlPanel: {
+    marginTop: 18,
+    gap: 12,
   },
   previewCard: {
     marginTop: 18,
@@ -466,15 +477,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     gap: 12,
-  },
-  previewTitle: {
-    color: "#F4F7FB",
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  previewLine: {
-    color: "rgba(244,247,251,0.76)",
-    fontSize: 14,
-    lineHeight: 20,
   },
 });

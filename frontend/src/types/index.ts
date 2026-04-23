@@ -21,6 +21,7 @@ export type AudioRecord = {
   id: string;
   tag_id: string;
   owner_id: string;
+  title?: string | null;
   object_key: string;
   file_url: string;
   mime_type: string;
@@ -52,6 +53,7 @@ export type UploadCredential = {
 export type TimelineRecord = {
   id: string;
   uid: string;
+  title?: string | null;
   object_key: string;
   file_url: string;
   mime_type: string;

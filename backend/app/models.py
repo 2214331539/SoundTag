@@ -34,6 +34,7 @@ class AudioRecord(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     tag_id: uuid.UUID = Field(foreign_key="tag.id", nullable=False, index=True)
     owner_id: uuid.UUID = Field(foreign_key="user.id", nullable=False, index=True)
+    title: str | None = Field(default=None, max_length=100)
     object_key: str = Field(nullable=False, max_length=255)
     file_url: str = Field(nullable=False, max_length=1024)
     mime_type: str = Field(nullable=False, max_length=64)

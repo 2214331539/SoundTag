@@ -30,14 +30,14 @@ function MainTabs() {
         name="Home"
         component={HomeScreen}
         options={{
-          title: "扫描",
+          title: "靠近标签",
         }}
       />
       <Tab.Screen
         name="Records"
         component={RecordsScreen}
         options={{
-          title: "记录",
+          title: "我的声音",
         }}
       />
     </Tab.Navigator>

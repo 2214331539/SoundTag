@@ -110,6 +110,7 @@ export async function requestUploadCredential(payload: {
 export async function bindTag(
   uid: string,
   payload: {
+    title?: string;
     object_key: string;
     file_url: string;
     mime_type: string;
@@ -125,4 +126,15 @@ export async function bindTag(
 export async function listTimelineRecords(): Promise<TimelineRecord[]> {
   const response = await api.get<TimelineRecord[]>("/records");
   return response.data;
+}
+
+
+export async function renameTimelineRecord(id: string, title: string): Promise<TimelineRecord> {
+  const response = await api.patch<TimelineRecord>(`/records/${encodeURIComponent(id)}`, { title });
+  return response.data;
+}
+
+
+export async function deleteTimelineRecord(id: string): Promise<void> {
+  await api.delete(`/records/${encodeURIComponent(id)}`);
 }

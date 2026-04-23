@@ -49,10 +49,13 @@ def lookup_tag(
         return TagStateResponse(uid=uid, status="locked")
 
     latest_record = _latest_record_for_tag(session, tag.id)
+    if latest_record is None:
+        return TagStateResponse(uid=uid, status="new")
+
     return TagStateResponse(
         uid=uid,
         status="owned",
-        latest_record=_serialize_audio_record(latest_record) if latest_record else None,
+        latest_record=_serialize_audio_record(latest_record),
     )
 
 
@@ -101,6 +104,7 @@ def bind_uploaded_audio(
     new_record = AudioRecord(
         tag_id=tag.id,
         owner_id=current_user.id,
+        title=payload.title.strip() if payload.title else None,
         object_key=payload.object_key,
         file_url=build_public_url(payload.object_key),
         mime_type=payload.mime_type,

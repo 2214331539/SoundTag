@@ -47,6 +47,7 @@ class AudioRecordRead(BaseModel):
     id: UUID
     tag_id: UUID
     owner_id: UUID
+    title: str | None = None
     object_key: str
     file_url: str
     mime_type: str
@@ -82,6 +83,7 @@ class UploadCredentialResponse(BaseModel):
 
 
 class FinalizeUploadPayload(BaseModel):
+    title: str | None = Field(default=None, max_length=100)
     object_key: str = Field(min_length=1, max_length=255)
     file_url: str = Field(min_length=1, max_length=1024)
     mime_type: str = Field(min_length=3, max_length=64)
@@ -89,9 +91,14 @@ class FinalizeUploadPayload(BaseModel):
     file_size: int | None = Field(default=None, ge=0)
 
 
+class UpdateRecordTitlePayload(BaseModel):
+    title: str = Field(min_length=1, max_length=100)
+
+
 class TimelineRecord(BaseModel):
     id: UUID
     uid: str
+    title: str | None = None
     object_key: str
     file_url: str
     mime_type: str

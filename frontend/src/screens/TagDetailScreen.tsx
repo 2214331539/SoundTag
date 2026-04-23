@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { Audio } from "expo-av";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useIsFocused } from "@react-navigation/native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { PrimaryButton } from "../components/PrimaryButton";
 import { ScreenShell } from "../components/ScreenShell";
+import { RootStackParamList } from "../navigation/types";
 import { lookupTag } from "../services/api";
+import { enablePlaybackMode } from "../services/audioMode";
 import { TagState } from "../types";
 import { formatDate, formatDuration } from "../utils/format";
-import { RootStackParamList } from "../navigation/types";
 
 
 type Props = NativeStackScreenProps<RootStackParamList, "TagDetail">;
@@ -46,28 +47,24 @@ export function TagDetailScreen({ navigation, route }: Props) {
     }
   }
 
-  async function playFromUrl(file_url: string) {
-    try {
-      await unloadSound();
+  async function playFromUrl(fileUrl: string) {
+    await unloadSound();
+    await enablePlaybackMode();
 
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: file_url },
-        { shouldPlay: true },
-      );
+    const { sound } = await Audio.Sound.createAsync(
+      { uri: fileUrl },
+      { shouldPlay: true },
+    );
 
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (!status.isLoaded) {
-          return;
-        }
-        setIsPlaying(status.isPlaying);
-      });
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if (!status.isLoaded) {
+        return;
+      }
+      setIsPlaying(status.isPlaying);
+    });
 
-      soundRef.current = sound;
-      setIsPlaying(true);
-    } catch (error) {
-      setIsPlaying(false);
-      throw error;
-    }
+    soundRef.current = sound;
+    setIsPlaying(true);
   }
 
   async function loadTag() {
@@ -76,10 +73,15 @@ export function TagDetailScreen({ navigation, route }: Props) {
       const response = await lookupTag(uid);
       setTagState(response);
 
-      if (response.status === "owned" && response.latest_record?.file_url) {
-        await playFromUrl(response.latest_record.file_url);
-      } else {
+      if (response.status !== "owned" || !response.latest_record?.file_url) {
         await unloadSound();
+        return;
+      }
+
+      try {
+        await playFromUrl(response.latest_record.file_url);
+      } catch (error) {
+        Alert.alert("播放失败", extractMessage(error));
       }
     } catch (error) {
       Alert.alert("加载失败", extractMessage(error));
@@ -119,11 +121,12 @@ export function TagDetailScreen({ navigation, route }: Props) {
   }
 
   const latestRecord = tagState?.latest_record;
+  const title = latestRecord?.title?.trim() || "未命名声音";
 
   return (
     <ScreenShell
-      title="播放标签详情"
-      subtitle={`UID: ${uid}`}
+      title="播放声音"
+      subtitle="再次靠近这张标签时，会直接进入这个播放页。"
       scroll
       headerAction={
         <PrimaryButton
@@ -135,36 +138,34 @@ export function TagDetailScreen({ navigation, route }: Props) {
       }
     >
       <View style={styles.heroCard}>
-        <Text style={styles.heroLabel}>绑定状态</Text>
-        <Text style={styles.heroTitle}>
-          {loading ? "加载中..." : tagState?.status === "owned" ? "已绑定" : "未绑定"}
-        </Text>
+        <Text style={styles.heroLabel}>当前声音</Text>
+        <Text style={styles.heroTitle}>{loading ? "加载中..." : title}</Text>
         <Text style={styles.heroText}>
-          进入该页面后，SoundTag 会自动流式播放最新的云端录音；你也可以暂停、继续或直接重新录音覆盖。
+          这张标签已经保存了一段声音。你可以播放，也可以重新录制一段声音来替换它。
         </Text>
       </View>
 
       <View style={styles.infoCard}>
-        <Text style={styles.infoTitle}>当前音频</Text>
+        <Text style={styles.infoTitle}>声音信息</Text>
         <Text style={styles.infoLine}>
           时长：{latestRecord ? formatDuration(latestRecord.duration_seconds) : "--"}
         </Text>
         <Text style={styles.infoLine}>
-          创建时间：{latestRecord ? formatDate(latestRecord.created_at) : "--"}
+          保存时间：{latestRecord ? formatDate(latestRecord.created_at) : "--"}
         </Text>
         <Text style={styles.infoLine}>
-          云端地址：{latestRecord?.file_url ?? "--"}
+          状态：{latestRecord ? "已保存，可播放" : "还没有可播放的声音"}
         </Text>
       </View>
 
       <View style={styles.actions}>
         <PrimaryButton
-          label={isPlaying ? "暂停播放" : "继续播放"}
+          label={isPlaying ? "暂停播放" : "播放声音"}
           onPress={() => void togglePlayback()}
           disabled={!latestRecord}
         />
         <PrimaryButton
-          label="重新录音"
+          label="重新录制"
           onPress={() => navigation.navigate("Record", { uid, mode: "overwrite" })}
           variant="ghost"
           disabled={!latestRecord && tagState?.status !== "owned"}
@@ -198,7 +199,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.1,
-    textTransform: "uppercase",
   },
   heroTitle: {
     color: "#F4F7FB",
