@@ -1,15 +1,57 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
+import { Platform } from "react-native";
 
 import { AuthPurpose, AuthUser, AudioRecord, RequestCodeResponse, TagState, TimelineRecord, TokenResponse, UploadCredential } from "../types";
 
 
 const SESSION_TOKEN_KEY = "soundtag/access-token";
 const SESSION_USER_KEY = "soundtag/current-user";
-const env = process.env as Record<string, string | undefined>;
+const DEFAULT_API_PORT = "8000";
+// Expo statically inlines EXPO_PUBLIC_* env vars during bundling.
+// @ts-expect-error React Native's process.env typing does not include Expo public env vars.
+const EXPO_PUBLIC_API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+
+function getDefaultApiBaseUrl() {
+  if (Platform.OS === "android") {
+    return `http://10.0.2.2:${DEFAULT_API_PORT}/api/v1`;
+  }
+
+  if (Platform.OS === "web") {
+    return `http://localhost:${DEFAULT_API_PORT}/api/v1`;
+  }
+
+  return `http://127.0.0.1:${DEFAULT_API_PORT}/api/v1`;
+}
+
+function resolveApiBaseUrl(rawValue?: string) {
+  const value = rawValue?.trim();
+  if (!value) {
+    return getDefaultApiBaseUrl();
+  }
+
+  try {
+    const parsed = new URL(value);
+
+    if (!parsed.port) {
+      parsed.port = DEFAULT_API_PORT;
+    }
+
+    // Android 模拟器中的 localhost 指向模拟器自身，而不是宿主机。
+    if (Platform.OS === "android" && parsed.hostname === "localhost") {
+      parsed.hostname = "10.0.2.2";
+    }
+
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return value.replace(/\/$/, "");
+  }
+}
+
+export const API_BASE_URL = resolveApiBaseUrl(EXPO_PUBLIC_API_BASE_URL);
 
 const api = axios.create({
-  baseURL: env.EXPO_PUBLIC_API_BASE_URL ?? "http://10.0.2.2:8000/api/v1",
+  baseURL: API_BASE_URL,
   timeout: 20000,
 });
 
@@ -23,6 +65,19 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (axios.isAxiosError(error) && !error.response) {
+      return Promise.reject(
+        new Error(`无法连接接口 ${API_BASE_URL}，请检查后端是否启动，以及当前设备是否能访问这个地址。`),
+      );
+    }
+
+    return Promise.reject(error);
+  },
+);
 
 
 export function setAccessToken(token: string | null) {
