@@ -21,6 +21,33 @@ class UserRead(BaseModel):
     created_at: datetime
 
 
+class FriendRead(UserRead):
+    friendship_created_at: datetime
+
+
+class FriendSearchResponse(BaseModel):
+    user: UserRead
+    is_friend: bool
+
+
+class FriendAddPayload(BaseModel):
+    phone: PhoneNumber
+
+
+class ChatMessageCreate(BaseModel):
+    body: str = Field(min_length=1, max_length=1000)
+
+
+class ChatMessageRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    sender_id: UUID
+    recipient_id: UUID
+    body: str
+    created_at: datetime
+
+
 class RequestCodePayload(BaseModel):
     phone: PhoneNumber
     purpose: AuthPurpose
@@ -123,3 +150,8 @@ class TimelineRecord(BaseModel):
     is_active: bool
     replaced_at: datetime | None = None
     created_at: datetime
+
+
+class FriendProfileResponse(BaseModel):
+    user: UserRead
+    records: list[TimelineRecord]

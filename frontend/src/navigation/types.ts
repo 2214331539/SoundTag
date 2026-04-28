@@ -11,9 +11,14 @@ export type RootStackParamList = {
   TagDetail: {
     uid: string;
   };
+  FriendProfile: {
+    friendId: string;
+    displayName?: string | null;
+  };
 };
 
 export type MainTabParamList = {
   Home: undefined;
   Records: undefined;
+  Friends: undefined;
 };

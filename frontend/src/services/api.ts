@@ -2,7 +2,20 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { Platform } from "react-native";
 
-import { AuthPurpose, AuthUser, AudioRecord, RequestCodeResponse, TagState, TimelineRecord, TokenResponse, UploadCredential } from "../types";
+import {
+  AuthPurpose,
+  AuthUser,
+  AudioRecord,
+  ChatMessage,
+  Friend,
+  FriendProfile,
+  FriendSearchResponse,
+  RequestCodeResponse,
+  TagState,
+  TimelineRecord,
+  TokenResponse,
+  UploadCredential,
+} from "../types";
 
 
 const SESSION_TOKEN_KEY = "soundtag/access-token";
@@ -207,4 +220,40 @@ export async function renameTimelineRecord(id: string, title: string): Promise<T
 
 export async function deleteTimelineRecord(id: string): Promise<void> {
   await api.delete(`/records/${encodeURIComponent(id)}`);
+}
+
+
+export async function listFriends(): Promise<Friend[]> {
+  const response = await api.get<Friend[]>("/friends");
+  return response.data;
+}
+
+
+export async function searchFriend(phone: string): Promise<FriendSearchResponse> {
+  const response = await api.get<FriendSearchResponse>("/friends/search", { params: { phone } });
+  return response.data;
+}
+
+
+export async function addFriend(phone: string): Promise<Friend> {
+  const response = await api.post<Friend>("/friends", { phone });
+  return response.data;
+}
+
+
+export async function getFriendProfile(friendId: string): Promise<FriendProfile> {
+  const response = await api.get<FriendProfile>(`/friends/${encodeURIComponent(friendId)}/profile`);
+  return response.data;
+}
+
+
+export async function listFriendMessages(friendId: string): Promise<ChatMessage[]> {
+  const response = await api.get<ChatMessage[]>(`/friends/${encodeURIComponent(friendId)}/messages`);
+  return response.data;
+}
+
+
+export async function sendFriendMessage(friendId: string, body: string): Promise<ChatMessage> {
+  const response = await api.post<ChatMessage>(`/friends/${encodeURIComponent(friendId)}/messages`, { body });
+  return response.data;
 }

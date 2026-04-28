@@ -62,10 +62,34 @@ export type TimelineRecord = {
   title?: string | null;
   object_key: string;
   file_url: string;
+  image_object_key?: string | null;
+  image_url?: string | null;
   mime_type: string;
   duration_seconds: number;
   file_size?: number | null;
   is_active: boolean;
   replaced_at?: string | null;
+  created_at: string;
+};
+
+export type Friend = AuthUser & {
+  friendship_created_at: string;
+};
+
+export type FriendSearchResponse = {
+  user: AuthUser;
+  is_friend: boolean;
+};
+
+export type FriendProfile = {
+  user: AuthUser;
+  records: TimelineRecord[];
+};
+
+export type ChatMessage = {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  body: string;
   created_at: string;
 };

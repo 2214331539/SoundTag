@@ -4,7 +4,7 @@ from sqlmodel import Session, select
 from app.api.deps import get_current_user
 from app.core.db import get_session
 from app.core.security import utcnow
-from app.models import AudioRecord, Tag, User
+from app.models import AudioRecord, Friendship, Tag, User
 from app.schemas import (
     AudioRecordRead,
     FinalizeUploadPayload,
@@ -38,15 +38,28 @@ def _serialize_audio_record(record: AudioRecord) -> AudioRecordRead:
     return payload.model_copy(update=updates)
 
 
+def _can_access_tag(session: Session, current_user: User, tag: Tag) -> bool:
+    if tag.owner_id == current_user.id:
+        return True
+
+    friendship = session.exec(
+        select(Friendship).where(Friendship.user_id == current_user.id, Friendship.friend_id == tag.owner_id)
+    ).first()
+    return friendship is not None
+
+
 @router.get("/{uid}", response_model=TagStateResponse)
 def lookup_tag(
     uid: str,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> TagStateResponse:
     tag = _fetch_tag_by_uid(session, uid)
     if tag is None:
         return TagStateResponse(uid=uid, status="new")
+
+    if not _can_access_tag(session, current_user, tag):
+        return TagStateResponse(uid=uid, status="locked")
 
     latest_record = _latest_record_for_tag(session, tag.id)
     if latest_record is None:

@@ -4,6 +4,8 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import { useAuth } from "../contexts/AuthContext";
 import { AuthScreen } from "../screens/AuthScreen";
+import { FriendProfileScreen } from "../screens/FriendProfileScreen";
+import { FriendsScreen } from "../screens/FriendsScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { RecordScreen } from "../screens/RecordScreen";
 import { RecordsScreen } from "../screens/RecordsScreen";
@@ -32,7 +34,7 @@ function MainTabs() {
         name="Home"
         component={HomeScreen}
         options={{
-          title: "扫一扫",
+          title: "扫描",
           tabBarIcon: ({ focused }) => <TabIcon focused={focused} icon="NFC" />,
         }}
       />
@@ -40,8 +42,16 @@ function MainTabs() {
         name="Records"
         component={RecordsScreen}
         options={{
-          title: "我的声音",
+          title: "音频",
           tabBarIcon: ({ focused }) => <TabIcon focused={focused} icon="♪" />,
+        }}
+      />
+      <Tab.Screen
+        name="Friends"
+        component={FriendsScreen}
+        options={{
+          title: "好友",
+          tabBarIcon: ({ focused }) => <TabIcon focused={focused} icon="友" />,
         }}
       />
     </Tab.Navigator>
@@ -89,6 +99,7 @@ export function AppNavigator() {
           <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen name="Record" component={RecordScreen} />
           <Stack.Screen name="TagDetail" component={TagDetailScreen} />
+          <Stack.Screen name="FriendProfile" component={FriendProfileScreen} />
         </>
       ) : (
         <Stack.Screen name="Auth" component={AuthScreen} />

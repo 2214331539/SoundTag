@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.auth import router as auth_router
+from app.api.friends import router as friends_router
 from app.api.records import router as records_router
 from app.api.tags import router as tags_router
 from app.core.config import get_settings
@@ -33,3 +34,4 @@ def health() -> dict[str, str]:
 app.include_router(auth_router, prefix=settings.api_v1_prefix)
 app.include_router(tags_router, prefix=settings.api_v1_prefix)
 app.include_router(records_router, prefix=settings.api_v1_prefix)
+app.include_router(friends_router, prefix=settings.api_v1_prefix)
